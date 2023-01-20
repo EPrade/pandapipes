@@ -3,6 +3,7 @@
 # Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
 import numpy as np
+import pandas as pd
 from numpy import linalg
 from pandapipes.component_models.abstract_models import BranchComponent
 from pandapipes.idx_branch import ACTIVE as ACTIVE_BR, FROM_NODE, TO_NODE, FROM_NODE_T, \
@@ -112,7 +113,7 @@ def pipeflow(net, sol_vec=None, **kwargs):
             raise PipeflowNotConverged("The hydraulic calculation did not converge to a solution.")
 
     if calculate_heat:
-        converged, _ = heat_transfer(net)
+        converged, _, t_out, t_init = heat_transfer(net)
         if not converged:
             raise PipeflowNotConverged("The heat transfer calculation did not converge to a "
                                        "solution.")
@@ -121,7 +122,6 @@ def pipeflow(net, sol_vec=None, **kwargs):
 
     extract_results_active_pit(net, node_pit, branch_pit, nodes_connected, branches_connected)
     extract_all_results(net, nodes_connected, branches_connected)
-
     # TODO: a really bad solution, should be passed in from outside!
     if get_net_option(net, "transient"):
         set_net_option(net, "time_step", get_net_option(net, "time_step") + 1)
@@ -197,13 +197,14 @@ def heat_transfer(net):
         node_pit[:, TINIT_OLD] = 293
         branch_pit[:, T_OUT_OLD] = 293
 
-
+    temp = pd.DataFrame()
     # This loop is left as soon as the solver converged
     while not get_net_option(net, "converged") and niter <= max_iter:
         logger.debug("niter %d" % niter)
 
         # solve_hydraulics is where the calculation takes place
         t_out, t_out_old, t_init, t_init_old, epsilon = solve_temperature(net)
+
 
         # Error estimation & convergence plot
         delta_t_init = np.abs(t_init - t_init_old)
@@ -229,7 +230,7 @@ def heat_transfer(net):
     net['converged'] = converged
     log_final_results(net, converged, niter, residual_norm, hyraulic_mode=False)
 
-    return converged, niter
+    return converged, niter, t_out, t_init
 
 
 def solve_hydraulics(net):
@@ -307,8 +308,12 @@ def solve_temperature(net):
     node_pit[:, TINIT] += x[:len(node_pit)] * options["alpha"]
     branch_pit[:, T_OUT] += x[len(node_pit):] * options["alpha"]
 
-
-
+    #Code eingefügt von Erik
+    # net._active_pit['node'][:, TINIT] = node_pit[:, TINIT]
+    # net._active_pit['branch'][:, TINIT] = branch_pit[:, T_OUT]
+    # print('pipeflow solve temperature:' , net._active_pit['node'][:, TINIT])
+    # print('timestep:', net._options['time_step'])
+    #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     return branch_pit[:, T_OUT], t_out_old, node_pit[:, TINIT], t_init_old, epsilon
 
 
