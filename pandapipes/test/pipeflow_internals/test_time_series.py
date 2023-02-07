@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+import pandapipes
 import pandapower.control as control
 from pandapipes import networks as nw
 from pandapipes import pp_dir
