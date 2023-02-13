@@ -104,7 +104,7 @@ def animated_plot_two_pipes(time_steps, sections, junctions, res_T, plotted_time
         fig.canvas.flush_events()
         plt.pause(.5)
 
-def animated_plot_one_pipe(time_steps, sections, res_T, junctions, plotted_timesteps=[5,30,90]):
+def animated_plot_one_pipe(time_steps, sections, junctions, res_T, plotted_timesteps=[5,30,90]):
     pipe1 = np.zeros(((sections + 1), res_T.shape[0]))
 
 
@@ -127,7 +127,17 @@ def animated_plot_one_pipe(time_steps, sections, res_T, junctions, plotted_times
 
 
     ax.set_xlabel("Length coordinate [m]")
+    textstr = "timestep iteration " + ":+" "\n timestep " + str(plotted_timesteps[1]) + ": ..." \
+    "\n timestep " + str(plotted_timesteps[2]) + ": --.--"
 
+
+
+    # these are matplotlib.patch.Patch properties
+    props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+
+    # place a text box in upper left in axes coords
+    ax.text(1.2, 0.5, textstr, transform=ax.transAxes, fontsize=14,
+            verticalalignment='top', bbox=props)
 
     line1, = ax.plot(np.arange(0, sections + 1, 1) * 1000 / sections, pipe1[:, plotted_timesteps[0]], color="black",
                      marker="+")
@@ -154,7 +164,7 @@ def animated_plot_one_pipe(time_steps, sections, res_T, junctions, plotted_times
 
 def test_districtheating_net_transient():
     net = pp.create_empty_network(fluid="water")
-    sections = 10
+    sections = 2
     pipelengths = np.array([145,175,103,131,21,101,85,206,88,510,33])/1000
 
     j0 = pp.create_junction(net, pn_bar=5, tfluid_k=293.15, name="junction 0")
@@ -334,7 +344,7 @@ def test_one_pipe_transient():
     pipe1[-1, :] = copy.deepcopy(res_T[:, 1])
     pipe1[1:-1, :] = np.transpose(copy.deepcopy(res_T[:, nodes:nodes + (sections - 1)]))
 
-    # 
+    #
     # datap1 = pd.read_csv(os.path.join(internals_data_path, "transient_one_pipe.csv"), sep=';',
     #                      header=1, nrows=5, keep_default_na=False)["T"]
     #
