@@ -26,53 +26,61 @@ def create_heat_consumers(net):
         new_length = length / (number_of_houses_per_route+2)
         old_junction_index = net.junction.shape[0]
         #create new junctions for pipes , flow control, heatexchanger
-        pps.create_junctions(net, number_of_houses_per_route, pn_bar=1, tfluid_k=283.15, name=('flow_control_from_route'+str(i)))
-        pps.create_junctions(net, number_of_houses_per_route, pn_bar=1, tfluid_k=283.15, name=('flow_control_to_route' + str(i)))
-        pps.create_junctions(net, number_of_houses_per_route, pn_bar=1, tfluid_k=283.15, name=('heat_exchanger_from_route' + str(i)))
-        pps.create_junctions(net, number_of_houses_per_route, pn_bar=1, tfluid_k=283.15, name=('heat_exchanger_to' + str(i)))
+        name_list = ['pipe/fc_'+str(i), 'fc/he_'+str(i), 'he_rf_'+str(i)] * number_of_houses_per_route
+        pps.create_junctions(net, number_of_houses_per_route*3, pn_bar=1, tfluid_k=283.15, name=name_list)
+
+        pps.create_junction(net, pn_bar=1, tfluid_k=283.15, name=('last_pipe_junction '+str(i)))
         #create new pipes
         pipe_junctions = [None] * (number_of_pipes_per_route*2)
         pipe_junctions[0] = from_j
+        pipe_junctions[1] = old_junction_index +1
         pipe_junctions[number_of_pipes_per_route*2-1] = to_j
-        old_junction_index_copy = old_junction_index_copy
-        for ii in range(1,number_of_pipes_per_route*2-2,2):
-            junction_index = old_junction_index + ii
+        old_junction_index_copy = old_junction_index
+        for ii in range(2,number_of_pipes_per_route*2-2,2):
+            junction_index = old_junction_index + ii-1
             pipe_junctions[ii] = junction_index
             junction_index += 3
             pipe_junctions[ii+1] = junction_index
-            old_junction_index += 2
-
+            old_junction_index += 1
+        pipe_junctions[-2] = junction_index
         new_from = pipe_junctions[::2]
         new_to = pipe_junctions[1::2]
         net.pipe = net.pipe.drop(net.pipe[net.pipe['name']==i].index)
         pps.create_pipes_from_parameters(net, new_from, new_to,length_km=new_length, diameter_m=0.05, k_mm=0.2, name=('route'+str(i)))
         #create flow controls
         flow_junctions = [None] * (number_of_houses_per_route * 2)
-        old_junction_index = old_junction_index_copy
-        for x in range(1,number_of_houses_per_route,2):
+        old_junction_index = old_junction_index_copy +1
+        #flow_junctions[0] = old_junction_index +1
+        for x in range(0,number_of_houses_per_route*2,2):
             junction_index = old_junction_index + x
             flow_junctions[x] = junction_index
             junction_index += 1
             flow_junctions[x+1] = junction_index
             old_junction_index += 1
-        new_from_fc = pipe_junctions[::2]
-        new_to_fc = pipe_junctions[1::2]
-        pps.create_flow_controls(net, new_from_fc, new_to_fc)
+        new_from_fc = flow_junctions[::2]
+        new_to_fc = flow_junctions[1::2]
+        pps.create_flow_controls(net, new_from_fc, new_to_fc, 5, 0.2)
         #create heat exchangers
         heat_junctions = [None] * (number_of_houses_per_route * 2)
-        old_junction_index = old_junction_index_copy
-        for x in range(1, number_of_houses_per_route, 2):
+        old_junction_index = old_junction_index_copy+2
+
+        for x in range(0, number_of_houses_per_route*2, 2):
             junction_index = old_junction_index + x
             heat_junctions[x] = junction_index
             junction_index += 1
             heat_junctions[x + 1] = junction_index
             old_junction_index += 1
-        new_from_he = pipe_junctions[::2]
-        new_to_he = pipe_junctions[1::2]
-        pps.create_heat_exchangers(net, new_from_he, new_to_he)
+        new_from_he = heat_junctions[::2]
+        new_to_he = heat_junctions[1::2]
+        heat_exchange = house_data[house_data['Trasse'] == i]['kW']
+        pps.create_heat_exchangers(net, new_from_he, new_to_he, 5, heat_exchange)
 
     return
 
+def create_return_flow(net):
+    #creates return flow pipes and junctions fpr district heating grid
+
+    return
 
 if __name__ == "__main__":
     fluid = "water"
