@@ -1,3 +1,4 @@
+import math
 from os.path import join
 import pandas as pd
 import numpy as np
@@ -11,11 +12,94 @@ from pandapower.plotting import create_annotation_collection
 from shapely.geometry import LineString
 from pandapipes.test.pipeflow_internals.test_transient import _output_writer
 from pandapipes.timeseries import run_timeseries
+import pandapower.control as control
+from pandapower.timeseries import DFData
+from pandapower.timeseries import OutputWriter
+from pandapower.plotting.plotting_toolbox import get_color_list, _rotate_dim2, get_angle_list, \
+    get_list
+import re
 
+class Vector:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+    def __sub__(self, other):
+        return Vector(self.x - other.x, self.y - other.y)
+    def __add__(self, other):
+        return Vector(self.x + other.x, self.y + other.y)
+    def dot(self, other):
+        return self.x * other.x + self.y * other.y
+    def norm(self):
+        return self.dot(self)**0.5
+    def normalized(self):
+        norm = self.norm()
+        return Vector(self.x / norm, self.y / norm)
+    def perp(self):
+        return Vector(1, -self.x / self.y)
+    def __mul__(self, scalar):
+        return Vector(self.x * scalar, self.y * scalar)
+    def __str__(self):
+        return f'({self.x}, {self.y})'
+
+    def perptoy(self):
+        return Vector(1, 0)
+
+    def perptox(self):
+        return Vector(1, -10000)
 
 def rf_coord(ref_point1, ref_point2, point, dist, x=False):
+    A = ref_point1
+    B = ref_point2
     #erzeugt einen punkt um 90° verschoben zu einer ref_Linie
-    m = (ref_point2['y'] - ref_point1['y'])/(ref_point2['x']-ref_point1['x'])
+    m = (B['y'] - A['y'])/(B['x']-A['x'])
+    #dist = 10
+    # A = Vector(ref_point1[0], ref_point1[1])
+    # B = Vector(ref_point2[0], ref_point2[1])
+    # AB = B - A
+    # if (A.y == B.y):
+    #     AB_perp_normed = AB.perptox().normalized()
+    # elif (A.x == B.x):
+    #     AB_perp_normed = AB.perptoy().normalized()
+    # else:
+    #     AB_perp_normed = AB.perp().normalized()
+    # dist = 2000
+    # P1 = B + AB_perp_normed * dist
+    # P2 = B - AB_perp_normed * dist
+    #
+    # P1_int = [int(s) for s in re.findall(r'\b\d+\b', f'Point{P1}')]
+    # P1_1 = P1_int[0] , P1_int[1]
+    # tempStr = (str(P1_1[0])+'.'+str(P1_1[1]))
+    # P1_float = float(tempStr)
+    # P1_2 = P1_int[2], P1_int[3]
+    # tempStr = (str(P1_2[0]) + '.' + str(P1_2[1]))
+    # P12_float = float(tempStr)
+    # point1 = P1_float , P12_float
+    #
+    # P2_int = [int(s) for s in re.findall(r'\b\d+\b', f'Point{P2}')]
+    # P2_1 = P2_int[0], P2_int[1]
+    # tempStr = (str(P2_1[0]) + '.' + str(P2_1[1]))
+    # P2_float = float(tempStr)
+    # P2_2 = P2_int[2], P2_int[3]
+    # tempStr = (str(P2_2[0]) + '.' + str(P2_2[1]))
+    # P22_float = float(tempStr)
+    # point2 = P2_float, P22_float
+
+
+    # dy = math.sqrt(dist**2/(m**2+1))
+    # dx = -m*dy
+    # A_new = [None] * 2
+    # B_new = [None] * 2
+    # A_new[0],A_new[1] = A[0] + dx, A[1] + dy
+    # B_new[0], B_new[1] = B[0] + dx, B[1] + dy
+    cd_length = dist*100000
+
+    ab = LineString([A, B])
+    left2 = ab.offset_curve(cd_length)
+
+    left2 = list(left2.coords)
+
+
+
     if x==True:
         x1 = point[0]
         y1 = point[1]
@@ -78,8 +162,9 @@ def create_front_and_return_flow(net, first_route=1, return_flow=True):
         r_f_coords = tuple(map(tuple, r_f_coords))
         r_f_points = []
         j_list = net.junction.index
+        fj = 10000
         for xy in range(net.junction_geodata.shape[0]):
-            dist = 0.0005
+            dist = 0
             #dist = 0
             point = net.junction_geodata.iloc[xy]
             try:
@@ -292,20 +377,40 @@ if __name__ == "__main__":
                                       t_flow_k=273.15+70)
     net.junction_geodata[["x", "y"]] = net.junction_geodata[["y", "x"]]
 
-    #calculations
+    # profiles_heat = pd.read_csv()
+    # ds_heat = DFData(profiles_heat)
+    #
+    # const_flow_m = control.ConstControl(net, element='flow_control', variable='mdot_kg_per_s',
+    #                                     element_index=net.source.index.values,
+    #                                     data_source=ds_heat,
+    #                                     profile_name=net.source.index.values.astype(str))
+    # const_heat_to = control.ConstControl(net, element='heat_exchanger', variable='t_k_to',
+    #                                     element_index=net.source.index.values,
+    #                                     data_source=ds_heat,
+    #                                     profile_name=net.source.index.values.astype(str))
+    # const_heat_from = control.ConstControl(net, element='heat_exchanger', variable='t_k_from',
+    #                                      element_index=net.source.index.values,
+    #                                      data_source=ds_heat,
+    #                                      profile_name=net.source.index.values.astype(str))
 
+    #calculations
+    #get temperature and mass flow values
+    t_vor = 330
+    t_r = 310
+    m_dot = 0.1
+    heat_values = m_dot*(t_vor-t_r)
     #pps.pipeflow(net, mode='hydraulics')
 
     pps.pipeflow(net, mode='all', transient=False)
-    not_connected_j = [12, 14, 16, 19, 20, 21, 23, 56, 83, 110, 193, 239, 280]
-    off_pipes = [0,1,2,3,4,5,6,7,8,9,10]
-    net.junction = net.junction.drop(not_connected_j)
-    net.pipe = net.pipe.drop(off_pipes)
-    dt = 60
-    time_steps = range(100)
-    ow = _output_writer(net, time_steps, ow_path=tempfile.gettempdir())
-    run_timeseries(net, time_steps, transient=True, mode="all", iter=50, dt=dt)
-    res_T = ow.np_results["res_internal.t_k"]
+    # not_connected_j = [12, 14, 16, 19, 20, 21, 23, 56, 83, 110, 193, 239, 280]
+    # off_pipes = [0,1,2,3,4,5,6,7,8,9,10]
+    # net.junction = net.junction.drop(not_connected_j)
+    # net.pipe = net.pipe.drop(off_pipes)
+    # dt = 60
+    # time_steps = range(100)
+    # ow = _output_writer(net, time_steps, ow_path=tempfile.gettempdir())
+    # run_timeseries(net, time_steps, transient=True, mode="all", iter=50, dt=dt)
+    # res_T = ow.np_results["res_internal.t_k"]
 
 
     #plotting
