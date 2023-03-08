@@ -18,34 +18,9 @@ from pandapower.timeseries import OutputWriter
 from pandapower.plotting.plotting_toolbox import get_color_list, _rotate_dim2, get_angle_list, \
     get_list
 import re
+from shapely import Point, offset_curve
 
-class Vector:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-    def __sub__(self, other):
-        return Vector(self.x - other.x, self.y - other.y)
-    def __add__(self, other):
-        return Vector(self.x + other.x, self.y + other.y)
-    def dot(self, other):
-        return self.x * other.x + self.y * other.y
-    def norm(self):
-        return self.dot(self)**0.5
-    def normalized(self):
-        norm = self.norm()
-        return Vector(self.x / norm, self.y / norm)
-    def perp(self):
-        return Vector(1, -self.x / self.y)
-    def __mul__(self, scalar):
-        return Vector(self.x * scalar, self.y * scalar)
-    def __str__(self):
-        return f'({self.x}, {self.y})'
 
-    def perptoy(self):
-        return Vector(1, 0)
-
-    def perptox(self):
-        return Vector(1, -10000)
 
 def rf_coord(ref_point1, ref_point2, point, dist, x=False):
     A = ref_point1
@@ -114,7 +89,39 @@ def rf_coord(ref_point1, ref_point2, point, dist, x=False):
         point = (x2, y2)
     return point
 
-def create_front_and_return_flow(net, first_route=1, return_flow=True):
+
+def offset_pipe(point_a, point_b, offset, side='right'):
+    """
+    Creates a Linestring parallel with an offset to Linestring between point_a and point_b
+    :param point_a: starting point of line
+    :type point_a: array or list with x and y coordinates
+    :param point_b: end point of line
+    :type point_b: array or list with x and y coordinates
+    :param offset: distance between original line and new line
+    :type offset: float
+    :param side: on which side of the original line will the parallel line be projected ('left' or 'right')
+    :type: str
+    :return: new starting and end points of parallel line with x and y coordinates
+    :rtype: tuple
+    """
+
+    A = Point(point_a)
+    B = Point(point_b)
+    AB = LineString([A, B])
+
+
+
+    AB_off = AB.parallel_offset(offset, side, 16, 0, 5)
+    points_ab=AB_off.boundary
+    point_A = [points_ab.geoms[0].xy[0][0],points_ab.geoms[0].xy[1][0]]
+    point_B = [points_ab.geoms[1].xy[0][0],points_ab.geoms[1].xy[1][0]]
+
+    return point_A, point_B
+
+
+
+
+def create_front_and_return_flow(net, return_offset, first_route=1,  return_flow=True):
     """
     Creates pipes, flow controls, heat exchangers, respective junctions and the return flow pipes for the given main
     routes and their respective number of heat sinks
@@ -157,28 +164,33 @@ def create_front_and_return_flow(net, first_route=1, return_flow=True):
             else:
                 names [j_name] = 'rf_cross_' + str(j_name)
 
-        rf_main_junctions_geodata = net.junction_geodata.iloc[b, :]
-        r_f_coords = np.stack((rf_main_junctions_geodata['x'], rf_main_junctions_geodata['y']), axis=1)
-        r_f_coords = tuple(map(tuple, r_f_coords))
         r_f_points = []
-        j_list = net.junction.index
+        j_list = net.junction.index.to_list()
         fj = 10000
+        dist = return_offset
+        sequence = []
         for xy in range(net.junction_geodata.shape[0]):
-            dist = 0
-            #dist = 0
-            point = net.junction_geodata.iloc[xy]
-            try:
-                fj = net.pipe[net.pipe['from_junction']==xy]['from_junction'].iloc[0]
-                tj = net.pipe[net.pipe['from_junction']==xy]['to_junction'].iloc[0]
-            except:
-                fj = net.pipe[net.pipe['to_junction'] == xy]['from_junction'].iloc[0]
-                tj = net.pipe[net.pipe['to_junction'] == xy]['to_junction'].iloc[0]
 
-            ref_point1 = net.junction_geodata.iloc[fj]
-            ref_point2 = net.junction_geodata.iloc[tj]
-            new_point = rf_coord(ref_point1, ref_point2, point, dist, x=False)
-            r_f_points.append(new_point)
-        r_f_points = tuple(map(tuple, r_f_points))
+            if xy in j_list:
+                try:
+                    j2 = net.pipe[net.pipe['from_junction'] == xy]['to_junction'].iloc[0]
+                except:
+                    j2 = net.pipe[net.pipe['to_junction'] == xy]['from_junction'].iloc[0]
+
+                ref_point1 = net.junction_geodata.iloc[xy]
+                ref_point2 = net.junction_geodata.iloc[j2]
+                new_point, new_point2 = offset_pipe(ref_point1, ref_point2, dist)
+                r_f_points.append(new_point)
+                sequence.append(xy)
+                if j2 in j_list:
+                    r_f_points.append(new_point2)
+                    j_list.remove(j2)
+                    sequence.append(j2)
+                j_list.remove(xy)
+
+        # sort list after junction number rising
+        r_f_points2 = [x for _, x in sorted(zip(sequence, r_f_points))]
+        r_f_points = tuple(map(tuple, r_f_points2))
         pps.create_junctions(net, net.junction_geodata.shape[0], pn_bar=1, tfluid_k=283.15, name=names,
                              geodata=r_f_points)
     # iterate over pipe_routes
@@ -259,6 +271,7 @@ def create_front_and_return_flow(net, first_route=1, return_flow=True):
         x_coords = np.repeat(x_coords, 2)
         y_coords = np.repeat(y_coords, 2)
         new_coords1 = np.stack((x_coords, y_coords), axis=1)
+        new_coords2 = new_coords1[::-1]
         pps.create_junctions(net, number_of_houses_per_route * 2, pn_bar=1, tfluid_k=283.15, name=name_list1,
                              geodata=new_coords1)
 
@@ -280,6 +293,7 @@ def create_front_and_return_flow(net, first_route=1, return_flow=True):
             y_coords = np.arange(from_coord[1], to_coord[1], y_dist)
 
         new_coords = np.stack((x_coords, y_coords), axis=1)
+        new_coords3 = new_coords[::-1]
         new_coords = tuple(map(tuple, new_coords))
 
         # create components from lists
@@ -355,6 +369,7 @@ def create_front_and_return_flow(net, first_route=1, return_flow=True):
 
 if __name__ == "__main__":
 
+
     fluid = "water"
 
     net = pps.create_empty_network(fluid=fluid)
@@ -371,11 +386,14 @@ if __name__ == "__main__":
                                      length_km=in_pipes['length_m']/1000,
                                      diameter_m=0.1, k_mm=0.02, name=in_pipes['pipe'])
 
-    pump_junction = create_front_and_return_flow(net)
+    pump_junction = create_front_and_return_flow(net, 0.0001)
 
     pps.create_circ_pump_const_pressure(net, pump_junction, 0, 9, 2.6,
                                       t_flow_k=273.15+70)
     net.junction_geodata[["x", "y"]] = net.junction_geodata[["y", "x"]]
+
+
+    pps.to_json(net, r"C:\Users\eprade\Documents\hybridbot\heating grid\net_v01.json")
 
     # profiles_heat = pd.read_csv()
     # ds_heat = DFData(profiles_heat)
@@ -395,13 +413,13 @@ if __name__ == "__main__":
 
     #calculations
     #get temperature and mass flow values
-    t_vor = 330
-    t_r = 310
-    m_dot = 0.1
-    heat_values = m_dot*(t_vor-t_r)
-    #pps.pipeflow(net, mode='hydraulics')
-
-    pps.pipeflow(net, mode='all', transient=False)
+    # t_vor = 330
+    # t_r = 310
+    # m_dot = 0.1
+    # heat_values = m_dot*(t_vor-t_r)
+    # #pps.pipeflow(net, mode='hydraulics')
+    #
+    # pps.pipeflow(net, mode='all', transient=False)
     # not_connected_j = [12, 14, 16, 19, 20, 21, 23, 56, 83, 110, 193, 239, 280]
     # off_pipes = [0,1,2,3,4,5,6,7,8,9,10]
     # net.junction = net.junction.drop(not_connected_j)
