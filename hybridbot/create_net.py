@@ -393,7 +393,7 @@ if __name__ == "__main__":
     net.junction_geodata[["x", "y"]] = net.junction_geodata[["y", "x"]]
 
 
-    pps.to_json(net, r"C:\Users\eprade\Documents\hybridbot\heating grid\net_v01.json")
+    pps.to_json(net, r"C:\Users\eprade\Documents\hybridbot\heating grid\net_v02_master.json")
 
     # profiles_heat = pd.read_csv()
     # ds_heat = DFData(profiles_heat)
