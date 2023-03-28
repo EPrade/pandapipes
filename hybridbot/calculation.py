@@ -45,7 +45,7 @@ def calculate_new_buildings(OpSimData, m_cols, net):
 if __name__ == "__main__":
     #1. prepare net
     #1.1 import net
-    net = pps.from_json(r"C:\Users\eprade\Documents\hybridbot\heating grid\net_v01.json")
+    net = pps.from_json(r"C:\Users\eprade\Documents\hybridbot\heating grid\net_v02_master.json")
     #1.2 get indices of heat exchangers and flow controls that need Opsim input or predefined data accordingly to them beeing "Neubaugebiet" or not
     new_building_routes = [1,2,31,4,32]
     #TODO:route 8 taucht nicht auf in den Zeitreihen

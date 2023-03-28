@@ -121,7 +121,7 @@ def offset_pipe(point_a, point_b, offset, side='right'):
 
 
 
-def create_front_and_return_flow(net, return_offset, first_route=1,  return_flow=True):
+def create_front_and_return_flow(net, return_offset, house_data, first_route=1,  return_flow=True):
     """
     Creates pipes, flow controls, heat exchangers, respective junctions and the return flow pipes for the given main
     routes and their respective number of heat sinks
@@ -146,8 +146,7 @@ def create_front_and_return_flow(net, return_offset, first_route=1,  return_flow
     pump_junction = None
 
     #get Trasse
-    path = r"C:\Users\eprade\Documents\hybridbot\straßen.csv"
-    house_data = pd.read_csv(path)
+
     house_pipes = house_data['Trasse']
     main_junction_n = net.junction_geodata.shape[0]
     main_pipes = range(net.pipe.shape[0])
@@ -386,14 +385,18 @@ if __name__ == "__main__":
                                      length_km=in_pipes['length_m']/1000,
                                      diameter_m=0.1, k_mm=0.02, name=in_pipes['pipe'])
 
-    pump_junction = create_front_and_return_flow(net, 0.0001)
+    path = r"C:\Users\eprade\Documents\hybridbot\straßen.csv"
+    path_ng = r"C:\Users\eprade\Documents\hybridbot\straßen_nur_ng.csv"
+    house_data = pd.read_csv(path_ng)
+
+    pump_junction = create_front_and_return_flow(net, 0.0001, house_data)
 
     pps.create_circ_pump_const_pressure(net, pump_junction, 0, 9, 2.6,
                                       t_flow_k=273.15+70)
     net.junction_geodata[["x", "y"]] = net.junction_geodata[["y", "x"]]
 
 
-    pps.to_json(net, r"C:\Users\eprade\Documents\hybridbot\heating grid\net_v02_master.json")
+    pps.to_json(net, r"C:\Users\eprade\Documents\hybridbot\heating grid\net_v03_ng.json")
 
     # profiles_heat = pd.read_csv()
     # ds_heat = DFData(profiles_heat)
@@ -419,7 +422,7 @@ if __name__ == "__main__":
     # heat_values = m_dot*(t_vor-t_r)
     # #pps.pipeflow(net, mode='hydraulics')
     #
-    # pps.pipeflow(net, mode='all', transient=False)
+    pps.pipeflow(net, mode='all', transient=False)
     # not_connected_j = [12, 14, 16, 19, 20, 21, 23, 56, 83, 110, 193, 239, 280]
     # off_pipes = [0,1,2,3,4,5,6,7,8,9,10]
     # net.junction = net.junction.drop(not_connected_j)
