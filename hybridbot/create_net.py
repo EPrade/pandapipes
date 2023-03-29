@@ -383,7 +383,7 @@ def create_front_and_return_flow(net, return_offset, house_data, first_route=1, 
 
     if drop_old_p_j == True:
         net.pipe = net.pipe.drop(main_pipes_idx)
-        net.junctions = net.junctions.drop(main_junctions_idx)
+        net.junction = net.junction.drop(main_junctions_idx)
     return pump_junction
 
 
