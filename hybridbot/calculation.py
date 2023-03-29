@@ -45,11 +45,12 @@ def calculate_new_buildings(OpSimData, m_cols, net):
 if __name__ == "__main__":
     #1. prepare net
     #1.1 import net
-    net = pps.from_json(r"C:\Users\eprade\Documents\hybridbot\heating grid\net_v02_master.json")
+    net = pps.from_json(r"C:\Users\eprade\Documents\hybridbot\heating grid\net_v03_ng.json")
     #1.2 get indices of heat exchangers and flow controls that need Opsim input or predefined data accordingly to them beeing "Neubaugebiet" or not
     new_building_routes = [1,2,31,4,32]
     #TODO:route 8 taucht nicht auf in den Zeitreihen
-    old_building_routes = [5,10,6,7,9]
+    #old_building_routes = [5,10,6,7,9]
+    old_building_routes = [5, 10]
 
 
     # new_routes_he = ['he_' +str(s) for s in new_building_routes]
@@ -64,21 +65,21 @@ if __name__ == "__main__":
 
 
     #1.2.2 import timeseries for old houses
-    houses_routes = pd.read_csv(r"C:\Users\eprade\Documents\hybridbot\straßen.csv")
+    houses_routes = pd.read_csv(r"C:\Users\eprade\Documents\hybridbot\straßen_nur_ng.csv")
     new_houses = houses_routes[houses_routes['Trasse'].isin(new_building_routes)]
     old_houses = houses_routes[houses_routes['Trasse'].isin(old_building_routes)]
 
     cols = \
-        pd.read_excel(r"C:\Users\eprade\Documents\hybridbot\heating grid\mdot_T_Speichersimulation_HAST_trassen_kurz.xlsx",
+        pd.read_excel(r"C:\Users\eprade\Documents\hybridbot\heating grid\mdot_T_Speichersimulation_HAST_trassen_ng.xlsx",
                       'mdot_HAST', header=None, nrows=1).values[0]
     mdot = pd.read_excel(
-        r"C:\Users\eprade\Documents\hybridbot\heating grid\mdot_T_Speichersimulation_HAST_trassen_kurz.xlsx", 'mdot_HAST',
+        r"C:\Users\eprade\Documents\hybridbot\heating grid\mdot_T_Speichersimulation_HAST_trassen_ng.xlsx", 'mdot_HAST',
         header=None, skiprows=1)
     t_flow_data = pd.read_excel(
-        r"C:\Users\eprade\Documents\hybridbot\heating grid\mdot_T_Speichersimulation_HAST_trassen_kurz.xlsx", 'TVL_HAST',
+        r"C:\Users\eprade\Documents\hybridbot\heating grid\mdot_T_Speichersimulation_HAST_trassen_ng.xlsx", 'TVL_HAST',
         header=None, skiprows=1)
     t_return_data = pd.read_excel(
-        r"C:\Users\eprade\Documents\hybridbot\heating grid\mdot_T_Speichersimulation_HAST_trassen_kurz.xlsx", 'TRL_HAST',
+        r"C:\Users\eprade\Documents\hybridbot\heating grid\mdot_T_Speichersimulation_HAST_trassen_ng.xlsx", 'TRL_HAST',
         header=None, skiprows=1)
 
 

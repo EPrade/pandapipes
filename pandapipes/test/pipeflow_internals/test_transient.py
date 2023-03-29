@@ -173,8 +173,8 @@ def test_districtheating_net_transient():
     j3 = pp.create_junction(net, pn_bar=5, tfluid_k=293.15, name="junction 3")
 
 
-    pp.create_circ_pump_const_mass_flow(net, from_junction=j0, to_junction=j3, p_bar=5,
-                                        mdot_kg_per_s=20, t_k=273.15 + 50)
+    pp.create_circ_pump_const_mass_flow(net, return_junction=j0, flow_junction=j3, p_flow_bar=5,
+                                        mdot_flow_kg_per_s=20, t_flow_k=273.15 + 50)
 
     pp.create_heat_exchanger(net, from_junction=j1, to_junction=j2, diameter_m=200e-3, qext_w=4200000)
 
