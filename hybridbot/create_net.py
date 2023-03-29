@@ -23,6 +23,10 @@ import re
 from shapely import Point, offset_curve
 
 
+from pandapipes.pf.pipeflow_setup import get_net_option, get_net_options, set_net_option, \
+    init_options, create_internal_results, write_internal_results, get_lookup, create_lookups,\
+    initialize_pit, check_connectivity, reduce_pit, set_user_pf_options, init_all_result_tables
+
 
 def rf_coord(ref_point1, ref_point2, point, dist, x=False):
     A = ref_point1
@@ -123,7 +127,7 @@ def offset_pipe(point_a, point_b, offset, side='right'):
 
 
 
-def create_front_and_return_flow(net, return_offset, house_data, first_route=1, drop_old_p_j = True):
+def create_front_and_return_flow(net, return_offset, house_data, first_route=1, drop_old_pipes = True):
     """
 
     :param net:
@@ -381,9 +385,15 @@ def create_front_and_return_flow(net, return_offset, house_data, first_route=1, 
             pump_junction = to_junction
         net.pipe.iloc[main_pipes,-2] = False
 
-    if drop_old_p_j == True:
+    if drop_old_pipes == True:
         net.pipe = net.pipe.drop(main_pipes_idx)
-        net.junction = net.junction.drop(main_junctions_idx)
+
+        # create_lookups(net)
+        # node_pit, branch_pit = initialize_pit(net)
+        # nodes_connected, branches_connected = check_connectivity(
+        #     net, branch_pit, node_pit, check_heat=False)
+
+        #net.junction = net.junction.drop(main_junctions_idx)
     return pump_junction
 
 
