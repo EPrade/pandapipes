@@ -129,19 +129,23 @@ def offset_pipe(point_a, point_b, offset, side='right'):
 
 def create_front_and_return_flow(net, return_offset, house_data, first_route=1, drop_old_pipes = True):
     """
+    Convenience function, that takes an existing pipe network and to be connected houses as input and creates respective heating grid components and return flow.
+    The existing pipes are split up evenly depending on the number of connected houses and return flow pipes are created parallel according to the return_offset value.
+    Houses are modelled via a combination of flow controls and heat exchangers. The function returns a modified pandapipes net with new junctions, pipes and components.
+    Additionally the junction for the connection of the supply component is returned.
 
-    :param net:
-    :type net:
-    :param return_offset:
-    :type return_offset:
-    :param house_data:
-    :type house_data:
-    :param first_route:
-    :type first_route:
-    :param return_flow:
-    :type return_flow:
-    :return:
-    :rtype:
+    :param net: existing pandapipes net
+    :type net: pandapipes net
+    :param return_offset: offset of return flow pipes to given pipes of pandapipes net
+    :type return_offset: float
+    :param house_data: names of houses an respective pipes/routes
+    :type house_data: pandas Dataframe
+    :param first_route: index of route that leads away from the supply station
+    :type first_route: int
+    :param drop_old_pipes: should the old/main pipes/routes should be dropped
+    :type drop_old_pipes: boolean
+    :return: junction where supply component has to be connected
+    :rtype: int
     """
 
     #distinguish cross junctions and end junctions
@@ -394,7 +398,7 @@ def create_front_and_return_flow(net, return_offset, house_data, first_route=1, 
         #     net, branch_pit, node_pit, check_heat=False)
 
         #net.junction = net.junction.drop(main_junctions_idx)
-    return pump_junction
+    return net, pump_junction
 
 
 if __name__ == "__main__":
@@ -420,7 +424,7 @@ if __name__ == "__main__":
     path_ng = r"C:\Users\eprade\Documents\hybridbot\straßen_nur_ng.csv"
     house_data = pd.read_csv(path_ng)
 
-    pump_junction = create_front_and_return_flow(net, 0.0001, house_data)
+    net, pump_junction = create_front_and_return_flow(net, 0.0001, house_data)
 
     pps.create_circ_pump_const_pressure(net, pump_junction, 0, 9, 2.6,
                                       t_flow_k=273.15+70)
