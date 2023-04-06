@@ -127,7 +127,7 @@ def offset_pipe(point_a, point_b, offset, side='right'):
 
 
 
-def create_front_and_return_flow(net, return_offset, house_data, first_route=1, drop_old_pipes = True):
+def create_front_and_return_flow(net, return_offset, house_data, first_route=1, drop_old_pipes = False):
     """
     Convenience function, that takes an existing pipe network and to be connected houses as input and creates respective heating grid components and return flow.
     The existing pipes are split up evenly depending on the number of connected houses and return flow pipes are created parallel according to the return_offset value.
@@ -267,6 +267,8 @@ def create_front_and_return_flow(net, return_offset, house_data, first_route=1, 
         #junction names
         name_list1 = ['pipe/fc_' + str(i), 'fc/he_' + str(i)] * number_of_houses_per_route
         name_list1[::2] = [name_list1[::2][x] + '_' + house_data[house_data['route']==i]['name'].iloc[x]  for x in list(range(number_of_houses_per_route))]
+        name_list1[1::2] = [name_list1[1::2][x] + '_' + house_data[house_data['route'] == i]['name'].iloc[x] for x in
+                            list(range(number_of_houses_per_route))]
         #get coordinate of new junctions created
         from_coord = net.junction_geodata.loc[from_j, :]
         to_coord = net.junction_geodata.loc[to_j, :]
@@ -327,7 +329,7 @@ def create_front_and_return_flow(net, return_offset, house_data, first_route=1, 
         #create components and new pipes
         pps.create_flow_controls(net, junction_list_fc, junction_list_he, 0.2, 0.2, name=('fc_'+str(i)))
         pps.create_heat_exchangers(net, junction_list_he, junction_list_rf, 0.01, heat_kw*1000, name=('he_'+str(i)))
-        pps.create_pipes_from_parameters(net, new_from, new_to,length_km=new_length, diameter_m=0.1, k_mm=0.02, name=('route'+str(i)),alpha_w_per_m2k=2)
+        pps.create_pipes_from_parameters(net, new_from, new_to, sections=5, length_km=new_length, diameter_m=0.1, k_mm=0.02, name=('route'+str(i)),alpha_w_per_m2k=2)
 
         #create return flow pipes
 
@@ -365,7 +367,7 @@ def create_front_and_return_flow(net, return_offset, house_data, first_route=1, 
             pipe_list[-1] = to_j_rf
             new_from = pipe_list[::2]
             new_to = pipe_list[1::2]
-            pps.create_pipes_from_parameters(net, new_from, new_to, length_km=new_length, diameter_m=0.1, k_mm=0.02,
+            pps.create_pipes_from_parameters(net, new_from, new_to, sections=5, length_km=new_length, diameter_m=0.1, k_mm=0.02,
                                              name=('route_rf_' + str(i)),alpha_w_per_m2k=5)
         else:
 
@@ -384,7 +386,7 @@ def create_front_and_return_flow(net, return_offset, house_data, first_route=1, 
             pipe_list[-1] = to_junction
             new_from = pipe_list[::2]
             new_to = pipe_list[1::2]
-            pps.create_pipes_from_parameters(net, new_from, new_to, length_km=new_length, diameter_m=0.1, k_mm=0.02,
+            pps.create_pipes_from_parameters(net, new_from, new_to, sections=5, length_km=new_length, diameter_m=0.1, k_mm=0.02,
                                              name=('route_rf_' + str(i)), alpha_w_per_m2k=2)
             pump_junction = to_junction
         net.pipe.iloc[main_pipes,-2] = False
@@ -431,7 +433,8 @@ if __name__ == "__main__":
     net.junction_geodata[["x", "y"]] = net.junction_geodata[["y", "x"]]
 
 
-    pps.to_json(net, r"C:\Users\eprade\Documents\hybridbot\heating grid\net_v03_ng.json")
+
+    #pps.to_json(net, r"C:\Users\eprade\Documents\hybridbot\heating grid\net_v03_ng.json")
 
     # profiles_heat = pd.read_csv()
     # ds_heat = DFData(profiles_heat)
@@ -457,7 +460,7 @@ if __name__ == "__main__":
     # heat_values = m_dot*(t_vor-t_r)
     # #pps.pipeflow(net, mode='hydraulics')
     #
-    pps.pipeflow(net, mode='all', transient=False)
+    #pps.pipeflow(net, mode='all', transient=False)
     # not_connected_j = [12, 14, 16, 19, 20, 21, 23, 56, 83, 110, 193, 239, 280]
     # off_pipes = [0,1,2,3,4,5,6,7,8,9,10]
     # net.junction = net.junction.drop(not_connected_j)
@@ -468,9 +471,37 @@ if __name__ == "__main__":
     # run_timeseries(net, time_steps, transient=True, mode="all", iter=50, dt=dt)
     # res_T = ow.np_results["res_internal.t_k"]
     drop_inactive_idx = [8,9,10,11,12,14,16,19,20,21,22,23,68,109,49]
-    net.junction = net.junction.drop(49)
+    net.junction = net.junction.drop(drop_inactive_idx)
     drop_pipe = [0,1,2,3,4,5,6,7,8,9,10]
     net.pipe = net.pipe.drop(drop_pipe)
+
+    net.pipe.alpha_w_per_m2k = 0.27
+
+    pps.pipeflow(net, mode='all', transient=False)
+
+    dt = 40
+    time_steps = range(10)
+    ow = _output_writer(net, time_steps, ow_path=tempfile.gettempdir())
+    run_timeseries(net, time_steps, transient=True, mode="all", iter=50, dt=dt)
+    res_T = ow.np_results["res_internal.t_k"]
+
+
+
+    #create result dataframe
+    he_results = pd.DataFrame()
+    he_results['name'] = net.junction.name[net.junction['name'].str.contains('/he') == True].reset_index(drop=True)
+    he_results['t_from_k'], he_results['t_to_k'] = net.res_heat_exchanger.iloc[:,3], net.res_heat_exchanger.iloc[:, 4]
+    he_results['v_mean_m_s'],he_results['p_from_bar'],he_results['p_to_bar']  = 0,0,0
+    he_results['type'] = 'house/he'
+    pipe_results = pd.DataFrame()
+    pipe_results['name'], pipe_results['t_from_k'], pipe_results['t_to_k'], pipe_results['v_mean_m_s'], \
+    pipe_results['p_from_bar'], pipe_results['p_to_bar'], pipe_results['type'] = net.pipe['name'], \
+    net.res_pipe['t_from_k'], net.res_pipe['t_to_k'], net.res_pipe['v_mean_m_per_s'], net.res_pipe['p_from_bar'], \
+    net.res_pipe['p_to_bar'], 'pipe'
+    pipe_results['type'].loc[net.pipe.name[net.pipe['name'].str.contains('rf')].index] = 'return_pipe'
+    results = pd.concat([he_results, pipe_results])
+
+
     #plotting
     from pandapipes import topology as tp
 

@@ -193,10 +193,9 @@ def heat_transfer(net):
     branch_pit = net["_active_pit"]["branch"]
     node_pit = net["_active_pit"]["node"]
     if get_net_option(net, "time_step") == 0:
-
+        #ToDo:Initial Temperature should come from user input
         node_pit[:, TINIT_OLD] = 293
         branch_pit[:, T_OUT_OLD] = 293
-
     temp = pd.DataFrame()
     # This loop is left as soon as the solver converged
     while not get_net_option(net, "converged") and niter <= max_iter:
@@ -360,7 +359,6 @@ def finalize_iteration(net, niter, error_1, error_2, residual_norm, nonlinear_me
             net["_active_pit"]["branch"][:, col2] = vals_2_old
     elif nonlinear_method != "constant":
         logger.warning("No proper nonlinear method chosen. Using constant settings.")
-
     # Setting convergence flag
     if error_2[niter] <= tol_2 and error_1[niter] <= tol_1 and residual_norm < tol_res:
         if nonlinear_method != "automatic":
