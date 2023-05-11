@@ -345,7 +345,11 @@ def initialize_pit(net):
     :rtype: tuple(np.array)
 
     """
-    pit = create_empty_pit(net)
+    if get_net_option(net, "transient") and get_net_option(net, "time_step") != 0:
+        pit = net["_pit"]
+    else:
+        create_lookups(net)
+        pit = create_empty_pit(net)
 
     for comp in net['component_list']:
         comp.create_pit_node_entries(net, pit["node"])

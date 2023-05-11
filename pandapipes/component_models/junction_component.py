@@ -11,7 +11,7 @@ from numpy import dtype
 from pandapipes.component_models.abstract_models.node_models import NodeComponent
 from pandapipes.component_models.component_toolbox import p_correction_height_air
 from pandapipes.idx_node import L, ELEMENT_IDX, RHO, PINIT, node_cols, HEIGHT, TINIT, PAMB, \
-    ACTIVE as ACTIVE_ND
+    ACTIVE as ACTIVE_ND, TINIT_OLD
 from pandapipes.pf.pipeflow_setup import add_table_lookup, get_table_number, \
     get_lookup
 from pandapipes.pf.pipeflow_setup import get_net_option
@@ -85,10 +85,14 @@ class Junction(NodeComponent):
         junction_pit[:, ELEMENT_IDX] = junctions.index.values
         junction_pit[:, HEIGHT] = junctions.height_m.values
         junction_pit[:, PINIT] = junctions.pn_bar.values
-        junction_pit[:, TINIT] = junctions.tfluid_k.values
         junction_pit[:, RHO] = get_fluid(net).get_density(junction_pit[:, TINIT])
         junction_pit[:, PAMB] = p_correction_height_air(junction_pit[:, HEIGHT])
         junction_pit[:, ACTIVE_ND] = junctions.in_service.values
+
+        if not get_net_option(net, "transient") or get_net_option(net, "time_step") == 0:
+            junction_pit[:, TINIT] = junctions.tfluid_k.values
+            junction_pit[:, TINIT_OLD] = junction_pit[:, TINIT]
+
 
     @classmethod
     def extract_results(cls, net, options, branch_results, nodes_connected, branches_connected):

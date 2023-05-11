@@ -1,4 +1,5 @@
 import pytest
+from pandapower.control import ConstControl
 
 import pandapipes as pp
 import numpy as np
@@ -24,7 +25,7 @@ class OutputWriterTransient(OutputWriter):
     def _init_log_variable(self, net, table, variable, index=None, eval_function=None,
                            eval_name=None):
         if table == "res_internal":
-            index = np.arange(len(net.junction) + net.pipe.sections.sum() - len(net.pipe))
+            index = np.arange(len(net.junction) + (net.pipe.sections-1).sum())
         return super()._init_log_variable(net, table, variable, index, eval_function, eval_name)
 
 
@@ -74,8 +75,11 @@ pp.create_pipe_from_parameters(net, j1, j2, length, 75e-3, k_mm=.0472, sections=
 
 # read in csv files for control of sources/sinks
 
-time_steps = range(100)
-dt = 60
+ds = DFData(pd.DataFrame({"t_k": [330] * 50 + [350] * 100 + [330] * 500}))
+t_ctrl = ConstControl(net, "ext_grid", "t_k", 0, profile_name="t_k", data_source=ds)
+
+time_steps = range(300)
+dt = 20
 iterations = 3000
 ow = _output_writer(net, time_steps, ow_path=tempfile.gettempdir())
 run_timeseries(net, time_steps, dynamic_sim=True, transient=transient_transfer, mode="all", dt=dt,
@@ -105,15 +109,19 @@ ax.set_title("Pipe 1")
 ax.set_ylabel("Temperature [K]")
 ax.set_xlabel("Length coordinate [m]")
 
-show_timesteps = [10, 30, 90]
+show_timesteps = [10, 80, 130, 200, 280]
 line1, = ax.plot(np.arange(0, sections + 1, 1) * length * 1000 / sections, pipe1[:, show_timesteps[0]], color="black",
                  marker="+", label="Time step " + str(show_timesteps[0]), linestyle="dashed")
 line11, = ax.plot(np.arange(0, sections + 1, 1) * length * 1000 / sections, pipe1[:, show_timesteps[1]], color="red",
                   linestyle="dotted", label="Time step " + str(show_timesteps[1]))
 line12, = ax.plot(np.arange(0, sections + 1, 1) * length * 1000 / sections, pipe1[:, show_timesteps[2]], color="blue",
                   linestyle="dashdot", label="Time step " + str(show_timesteps[2]))
+line13, = ax.plot(np.arange(0, sections + 1, 1) * length * 1000 / sections, pipe1[:, show_timesteps[3]], color="green",
+                  linestyle="dashed", label="Time step " + str(show_timesteps[3]))
+line14, = ax.plot(np.arange(0, sections + 1, 1) * length * 1000 / sections, pipe1[:, show_timesteps[4]], color="orange",
+                  linestyle="solid", label="Time step " + str(show_timesteps[4]))
 
-ax.set_ylim((280, 335))
+ax.set_ylim((280, 355))
 ax.legend()
 fig.canvas.draw()
 plt.show()

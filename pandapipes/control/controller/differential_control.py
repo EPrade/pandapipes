@@ -1,7 +1,8 @@
-# -*- coding: utf-8 -*-
+# Copyright (c) 2020-2023 by Fraunhofer Institute for Energy Economics
+# and Energy System Technology (IEE), Kassel, and University of Kassel. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
-# Copyright (c) 2016-2022 by University of Kassel and Fraunhofer Institute for Energy Economics
-# and Energy System Technology (IEE), Kassel. All rights reserved.
+from pandapower.auxiliary import _detect_read_write_flag, write_to_net
 
 import numpy as np
 from pandapower.auxiliary import _detect_read_write_flag, write_to_net

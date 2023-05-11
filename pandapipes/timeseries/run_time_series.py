@@ -5,12 +5,13 @@
 import tempfile
 
 from pandapower.control import NetCalculationNotConverged
-
-from pandapipes.pipeflow import PipeflowNotConverged, pipeflow
 from pandapower.control.util.diagnostic import control_diagnostic
 from pandapower.timeseries.output_writer import OutputWriter
-from pandapower.timeseries.run_time_series import init_time_series as init_time_series_pp, cleanup,\
+from pandapower.timeseries.run_time_series import init_time_series as init_time_series_pp, cleanup, \
     run_loop
+
+from pandapipes.pf.pipeflow_setup import set_user_pf_options
+from pandapipes.pipeflow import PipeflowNotConverged, pipeflow
 
 try:
     import pandaplan.core.pplog as logging
@@ -122,7 +123,9 @@ def run_timeseries(net, time_steps=None, continue_on_divergence=False, verbose=T
     """
     ts_variables = init_time_series(net, time_steps, continue_on_divergence, verbose, **kwargs)
     # A bad fix, need to sequence better - before the controllers are activated!
-    #net['_options']['dt'] = kwargs['dt']
+    if "dt" in kwargs:
+        set_user_pf_options(net, dt=kwargs["dt"])
+    # net['_options']['dt'] = kwargs['dt']
     control_diagnostic(net)
     run_loop(net, ts_variables, **kwargs)
 
