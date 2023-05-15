@@ -209,6 +209,8 @@ def create_front_and_return_flow(net, return_offset, house_data, first_route=1, 
     end_routes = pd.DataFrame()
     end_routes['name'] = net.pipe[net.pipe['to_junction'].isin(end_junctions)].name
 
+    routes_with_houses = house_data['route'].unique()
+    pipes_without_houses = net.pipe[~net.pipe['name'].isin(routes_with_houses)]
     # iterate over main pipe_routes to create junctions for flow controls, heat exchangers and return flow
     for i in house_data['route'].unique():
         #ToDo: currently extracting heat for heat exchangers from house_data. Should probably be standard value or function input
@@ -249,6 +251,7 @@ def create_front_and_return_flow(net, return_offset, house_data, first_route=1, 
                 pipe_variable+=2
             junction_list_fc[-1] = to_j
             pipe_list = pipe_list[0: -1]
+
         else:
             #end_junctions = False
             pipe_list = [None] * (number_of_houses_per_route*2+2)
@@ -302,6 +305,7 @@ def create_front_and_return_flow(net, return_offset, house_data, first_route=1, 
         new_coords2 = new_coords1[::-1]
 
         #create new junctions for components and houses
+
         pps.create_junctions(net, number_of_houses_per_route * 2, pn_bar=1, tfluid_k=283.15, name=name_list1,
                              geodata=new_coords1)
 
@@ -402,7 +406,25 @@ def create_front_and_return_flow(net, return_offset, house_data, first_route=1, 
             pps.create_pipes_from_parameters(net, new_from, new_to, sections=5, length_km=new_length, diameter_m=diameter_m, k_mm=0.02,
                                              name=('route_rf_' + str(i)), alpha_w_per_m2k=alpha_per_w_m2k)
             pump_junction = to_junction
-        net.pipe.iloc[main_pipes,-2] = False
+
+        if to_j in end_junctions:
+
+            idx_end = net.junction[net.junction['name']== name_list1[-2]].index
+            net.junction.loc[idx_end, 'in_service'] = False
+            net.junction.iloc[to_j, 0] = name_list1[-2]
+    #ToDo Exclude pipes that have no houses and are only there for connection purpose
+    main_pipes = [*main_pipes]
+    droppable_pipes = [ele for ele in main_pipes if ele not in pipes_without_houses.index.tolist()]
+    if pipes_without_houses.empty == False:
+
+        #create return flow pipe
+        trans_pipe_from = net.pipe.iloc[pipes_without_houses.index, 1].iloc[0]
+        trans_pipe_to = net.pipe.iloc[pipes_without_houses.index, 2].iloc[0]
+        trans_pipe_rf_from = net.junction[net.junction['name'].str.contains('rf_cross_' + str(trans_pipe_from))==True].index
+        trans_pipe_rf_to = net.junction[net.junction['name'].str.contains('rf_cross_' + str(trans_pipe_to))==True].index
+        pps.create_pipe_from_parameters(net, trans_pipe_rf_from.to_list()[0], trans_pipe_rf_to.to_list()[0], name='rf_connection' ,length_km=net.pipe.iloc[pipes_without_houses.index, 4].iloc[0], diameter_m=net.pipe.iloc[pipes_without_houses.index, 5].iloc[0], alpha_w_per_m2k=net.pipe.iloc[pipes_without_houses.index, 8].iloc[0], sections=net.pipe.iloc[pipes_without_houses.index, 11].iloc[0])
+
+    net.pipe.iloc[droppable_pipes,-2] = False
         # if end_routes[end_routes['name'] == i].shape[0] > 0:
         #     first_rf_j = net.junction[net.junction['name']== name_list[-1]].index[0]
         #     last_f_j = net.pipe[net.pipe['name'] ==i]['to_junction'].iloc[0]
@@ -413,7 +435,7 @@ def create_front_and_return_flow(net, return_offset, house_data, first_route=1, 
         #     #t_return_heat = heat_values[heat_values['name'] == i]['kW'].iloc[0]*1000
         #     pps.create_heat_exchanger(net, connection_j_idx, first_rf_j, 0.02, 0, name=junction_name)
     if drop_old_pipes == True:
-        net.pipe = net.pipe.drop(main_pipes_idx)
+        net.pipe = net.pipe.drop(droppable_pipes)
 
         # create_lookups(net)
         # node_pit, branch_pit = initialize_pit(net)
@@ -447,6 +469,7 @@ def calculate_heat_transfer_coefficient(r_i, r_m, lambda_is, lambda_soil, h_s, a
     return u
 
 def switch_off_routes(net):
+    #only applicable for end routes
     temp_a = net.pipe[['from_junction']].values.tolist()
     temp_a.extend(net.pipe[['to_junction']].values.tolist())
     # get junctions that only appear once
@@ -476,11 +499,15 @@ if __name__ == "__main__":
 
     #read data
     #in_junctions = pd.read_csv(r"C:\Users\eprade\Documents\hybridbot\junctions.csv")
-    in_junctions = pd.read_csv(r"C:\Users\eprade\Documents\hybridbot\heating grid\net\junctions_new.CSV", delimiter=';')
+    #in_junctions = pd.read_csv(r"C:\Users\eprade\Documents\hybridbot\heating grid\net\junctions_new.CSV", delimiter=';')
+    in_junctions = pd.read_csv(r"C:\Users\eprade\Documents\hybridbot\heating grid\net\junctions_new_ng_only.CSV", delimiter=';')
     #in_pipes = pd.read_csv(r"C:\Users\eprade\Documents\hybridbot\pipes.csv")
-    in_pipes = pd.read_csv(r"C:\Users\eprade\Documents\hybridbot\heating grid\net\pipes_new.CSV", delimiter=';')
+    #in_pipes = pd.read_csv(r"C:\Users\eprade\Documents\hybridbot\heating grid\net\pipes_new.CSV", delimiter=';')
+    in_pipes = pd.read_csv(r"C:\Users\eprade\Documents\hybridbot\heating grid\net\pipes_new_ng_only.CSV", delimiter=';')
     #pipe_parameters = pd.read_csv(r"C:\Users\eprade\Documents\hybridbot\heating grid\pipe_parameters.csv")
-    pipe_parameters = pd.read_csv(r"C:\Users\eprade\Documents\hybridbot\heating grid\net\pipe_parameters_new.CSV", delimiter=';')
+    #pipe_parameters = pd.read_csv(r"C:\Users\eprade\Documents\hybridbot\heating grid\net\pipe_parameters_new.CSV", delimiter=';')
+    pipe_parameters = pd.read_csv(r"C:\Users\eprade\Documents\hybridbot\heating grid\net\pipe_parameters_new_ng_only.CSV",
+                                  delimiter=';')
 
     #prepare net
     geodata = in_junctions[['long', 'lat']].values
@@ -495,18 +522,20 @@ if __name__ == "__main__":
 
     path = r"C:\Users\eprade\Documents\hybridbot\straßen.csv"
     path_ng = r"C:\Users\eprade\Documents\hybridbot\straßen_nur_ng.csv"
+    path_ng_new = r"C:\Users\eprade\Documents\hybridbot\heating grid\net\houses_ng_only.CSV"
     path_complete = r"C:\Users\eprade\Documents\hybridbot\heating grid\net\houses.CSV"
-    house_data = pd.read_csv(path_complete, delimiter=';')
+    house_data = pd.read_csv(path_ng_new, delimiter=';')
     #heat_values = pd.read_csv(r"C:\Users\eprade\Documents\hybridbot\heating grid\heat_values_trassen.csv")
 
 
     net, pump_junction = create_front_and_return_flow(net, 0.0001, house_data)
 
-    pps.create_circ_pump_const_pressure(net, pump_junction, 0, 6, 2.6,
+    pps.create_circ_pump_const_pressure(net, pump_junction, 0, 6, 2.5,
                                       t_flow_k=273.15+70)
+    # pps.create_ext_grid(net, pump_junction, p_bar=3)
+    # pps.create_ext_grid(net, 0, p_bar=6, t_k=340)
 
-
-
+    net.heat_exchanger.iloc[:,4] = 30000
     switch_off_routes(net)
     #pps.to_json(net, r"C:\Users\eprade\Documents\hybridbot\heating grid\net_v17_04_ng.json")
 
@@ -553,7 +582,7 @@ if __name__ == "__main__":
     #net.pipe.alpha_w_per_m2k = 5
     net.flow_control.iloc[:, 3] = 0.075
     end_fcs = net.flow_control[net.flow_control['name'].str.contains('end')].index
-    net.flow_control.iloc[end_fcs, 3] = 0.15
+    net.flow_control.iloc[end_fcs, 3] = 0.9
     mdot = 0.15
     heat = 4200 * mdot * 20
     net.heat_exchanger.iloc[:, 4] = 10
@@ -572,11 +601,12 @@ if __name__ == "__main__":
 
     net.pipe = net.pipe.drop(net.res_pipe[net.res_pipe.isna().any(axis=1)].index)
     net.junction = net.junction.drop(net.res_junction[net.res_junction.isna().any(axis=1)].index)
-    # dt = 40
-    # time_steps = range(10)
-    # ow = _output_writer(net, time_steps, ow_path=tempfile.gettempdir())
-    # run_timeseries(net, time_steps, transient=True, mode="all", iter=50, dt=dt)
-    # res_T = ow.np_results["res_internal.t_k"]
+
+    dt = 60*15
+    time_steps = range(10)
+    ow = _output_writer(net, time_steps, ow_path=tempfile.gettempdir())
+    run_timeseries(net, time_steps, transient=True, mode="all", iter=10, dt=dt)
+    res_T = ow.np_results["res_internal.t_k"]
 
 
 
