@@ -535,8 +535,8 @@ if __name__ == "__main__":
     # pps.create_ext_grid(net, pump_junction, p_bar=3)
     # pps.create_ext_grid(net, 0, p_bar=6, t_k=340)
 
-    net.heat_exchanger.iloc[:,4] = 30000
-    switch_off_routes(net)
+    # net.heat_exchanger.iloc[:,4] = 30000
+    # switch_off_routes(net)
     #pps.to_json(net, r"C:\Users\eprade\Documents\hybridbot\heating grid\net_v17_04_ng.json")
 
     # profiles_heat = pd.read_csv()
@@ -580,21 +580,22 @@ if __name__ == "__main__":
     # net.pipe = net.pipe.drop(drop_pipe)
 
     #net.pipe.alpha_w_per_m2k = 5
-    net.flow_control.iloc[:, 3] = 0.075
-    end_fcs = net.flow_control[net.flow_control['name'].str.contains('end')].index
-    net.flow_control.iloc[end_fcs, 3] = 0.9
-    mdot = 0.15
-    heat = 4200 * mdot * 20
-    net.heat_exchanger.iloc[:, 4] = 10
-    net.heat_exchanger.iloc[end_fcs, 4] = 10
-    r_i = 0.5
-    r_m = 0.7
-    lambda_is = 0.035
-    lambda_soil = 0.1
-    h_s = 0.5
-    a = 0.5
-    u = calculate_heat_transfer_coefficient(r_i, r_m, lambda_is, lambda_soil, h_s, a)
-    net.pipe.iloc[:,8] = u
+
+    # net.flow_control.iloc[:, 3] = 0.075
+    # end_fcs = net.flow_control[net.flow_control['name'].str.contains('end')].index
+    # net.flow_control.iloc[end_fcs, 3] = 0.9
+    # mdot = 0.15
+    # heat = 4200 * mdot * 20
+    # net.heat_exchanger.iloc[:, 4] = 10
+    # net.heat_exchanger.iloc[end_fcs, 4] = 10
+    # r_i = 0.5
+    # r_m = 0.7
+    # lambda_is = 0.035
+    # lambda_soil = 0.1
+    # h_s = 0.5
+    # a = 0.5
+    # u = calculate_heat_transfer_coefficient(r_i, r_m, lambda_is, lambda_soil, h_s, a)
+    # net.pipe.iloc[:,8] = u
 
 
     pps.pipeflow(net, mode='all', transient=False)
@@ -602,11 +603,12 @@ if __name__ == "__main__":
     net.pipe = net.pipe.drop(net.res_pipe[net.res_pipe.isna().any(axis=1)].index)
     net.junction = net.junction.drop(net.res_junction[net.res_junction.isna().any(axis=1)].index)
 
-    dt = 60*15
+    dt = 60
     time_steps = range(10)
     ow = _output_writer(net, time_steps, ow_path=tempfile.gettempdir())
     run_timeseries(net, time_steps, transient=True, mode="all", iter=10, dt=dt)
     res_T = ow.np_results["res_internal.t_k"]
+    res_junction = ow.np_results["res_junction.t_k"]
 
 
 
