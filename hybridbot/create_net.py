@@ -530,7 +530,7 @@ if __name__ == "__main__":
 
     net, pump_junction = create_front_and_return_flow(net, 0.0001, house_data)
 
-    pps.create_circ_pump_const_pressure(net, pump_junction, 0, 6, 2.5,
+    pps.create_circ_pump_const_pressure(net, pump_junction, 0, 3, 2.5,
                                       t_flow_k=273.15+70)
     # pps.create_ext_grid(net, pump_junction, p_bar=3)
     # pps.create_ext_grid(net, 0, p_bar=6, t_k=340)
