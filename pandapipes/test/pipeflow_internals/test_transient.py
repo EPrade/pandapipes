@@ -42,7 +42,7 @@ def _output_writer(net, time_steps, ow_path=None):
     :rtype: pandapower.timeseries.output_writer.OutputWriter
     """
     log_variables = [
-        ('res_junction', 't_k'), ('res_pipe', 't_to_k'), ('res_internal', 't_k')
+        ('res_junction', 't_k'), ('res_pipe', 't_to_k'), ('res_pipe', 't_from_k'), ('res_internal', 't_k')
     ]
     ow = OutputWriterTransient(net, time_steps, output_path=ow_path, log_variables=log_variables)
     return ow

@@ -285,6 +285,12 @@ def calculate_new_buildings(OpSimData, callNumber, m_cols, net, new_houses):
     # print(input_data)
     return net
 
+def heat_loss_pipe(net, res_pipe_to, res_pipe_from, time_steps):
+    dT = res_pipe_from[time_steps[-1]] - res_pipe_to[time_steps[-1]]
+    mdot = net.res_pipe['mdot_from_kg_per_s']
+    Q_loss = dT * mdot * 4200
+    Q_loss_sum = Q_loss.sum()
+    return Q_loss_sum
 
 def calculate_new_buildings_transient(OpSimData, callNumber, m_cols, net, new_houses):
     t_flow = OpSimData.loc['TEMPERATURE_T_1_THERMAL_STORAGE', :]

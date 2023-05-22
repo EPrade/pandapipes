@@ -531,7 +531,7 @@ if __name__ == "__main__":
     net, pump_junction = create_front_and_return_flow(net, 0.0001, house_data)
 
     pps.create_circ_pump_const_pressure(net, pump_junction, 0, 3, 2.5,
-                                      t_flow_k=273.15+70)
+                                      t_flow_k=273.15+80)
     # pps.create_ext_grid(net, pump_junction, p_bar=3)
     # pps.create_ext_grid(net, 0, p_bar=6, t_k=340)
 
@@ -595,7 +595,7 @@ if __name__ == "__main__":
     # h_s = 0.5
     # a = 0.5
     # u = calculate_heat_transfer_coefficient(r_i, r_m, lambda_is, lambda_soil, h_s, a)
-    # net.pipe.iloc[:,8] = u
+    net.pipe.iloc[:,8] = 0
 
 
     pps.pipeflow(net, mode='all', transient=False)
@@ -609,8 +609,8 @@ if __name__ == "__main__":
     run_timeseries(net, time_steps, transient=True, mode="all", iter=10, dt=dt)
     res_T = ow.np_results["res_internal.t_k"]
     res_junction = ow.np_results["res_junction.t_k"]
-
-
+    res_pipe_to = ow.np_results["res_pipe.t_to_k"]
+    res_pipe_from = ow.np_results["res_pipe.t_from_k"]
 
     #create result dataframe
     results = create_results(net)
