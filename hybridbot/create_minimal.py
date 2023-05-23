@@ -9,7 +9,9 @@ import matplotlib.pyplot as plt
 import geopandas as gp
 from pandapower.plotting import create_annotation_collection
 from shapely.geometry import LineString
-
+from pandapipes.test.pipeflow_internals.test_transient import _output_writer
+from pandapipes.timeseries import run_timeseries
+import tempfile
 if __name__ == "__main__":
     fluid = "water"
 
@@ -20,6 +22,20 @@ if __name__ == "__main__":
     pps.create_pipes_from_parameters(net, [0,1,6,3], [1,4,3,7], 5, 0.1)
     pps.create_circ_pump_const_pressure(net, 7, 0, 9, 2.6,
                                     t_flow_k=273.15+90)
+    net.pipe.iloc[:, 8] = 0.1
+
+    #pps.pipeflow(net, mode='all', transient=False)
+
+    dt = 60
+    time_steps = range(10)
+    ow = _output_writer(net, time_steps, ow_path=tempfile.gettempdir())
+    run_timeseries(net, time_steps, transient=True, mode="all", iter=10, dt=dt)
+    res_T = ow.np_results["res_internal.t_k"]
+    res_junction = ow.np_results["res_junction.t_k"]
+    res_pipe_to = ow.np_results["res_pipe.t_to_k"]
+    res_pipe_from = ow.np_results["res_pipe.t_from_k"]
+
+
     from pandapipes import topology as tp
 
     import networkx as nx
@@ -34,6 +50,3 @@ if __name__ == "__main__":
     nx.draw_networkx(ng, pos=pos, ax=ax)
 
     plt.show()
-    pps.pipeflow(net, mode='all', transient=False)
-    # plot.simple_plot(net, junction_size=0.25, heat_exchanger_size=0.05, flow_control_size=0.00005,
-    #                  flow_control_color='blue')
