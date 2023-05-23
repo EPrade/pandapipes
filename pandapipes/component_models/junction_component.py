@@ -5,16 +5,13 @@
 from warnings import warn
 
 import numpy as np
-import pandas as pd
 from numpy import dtype
-
 from pandapipes.component_models.abstract_models.node_models import NodeComponent
 from pandapipes.component_models.component_toolbox import p_correction_height_air
 from pandapipes.idx_node import L, ELEMENT_IDX, RHO, PINIT, node_cols, HEIGHT, TINIT, PAMB, \
     ACTIVE as ACTIVE_ND
 from pandapipes.pf.pipeflow_setup import add_table_lookup, get_table_number, \
     get_lookup
-from pandapipes.pf.pipeflow_setup import get_net_option
 from pandapipes.properties.fluids import get_fluid
 
 
@@ -91,45 +88,44 @@ class Junction(NodeComponent):
         junction_pit[:, ACTIVE_ND] = junctions.in_service.values
 
     @classmethod
-    def extract_results(cls, net, options, branch_results, nodes_connected, branches_connected):
+    def extract_results(cls, net, options, branch_results, mode):
         """
         Function that extracts certain results.
 
-        :param nodes_connected:
-        :type nodes_connected:
-        :param branches_connected:
-        :type branches_connected:
-        :param branch_results:
-        :type branch_results:
+        :param mode:
+        :type mode:
         :param net: The pandapipes network
         :type net: pandapipesNet
         :param options:
         :type options:
+        :param branch_results:
+        :type branch_results:
+        :param mode:
+        :type mode:
         :return: No Output.
         """
         res_table = net["res_" + cls.table_name()]
 
-        if get_net_option(net, "transient"):
-            # output, all_float = cls.get_result_table(net)
-            if "res_internal" not in net:
-                net["res_internal"] = pd.DataFrame(
-                    np.NAN, columns=["t_k"], index=np.arange(len(net["_active_pit"]["node"][:, TINIT])),
-                    dtype=np.float64
-                )
-            net["res_internal"]["t_k"] = net["_active_pit"]["node"][:, TINIT]
-
         f, t = get_lookup(net, "node", "from_to")[cls.table_name()]
-        fa, ta = get_lookup(net, "node", "from_to_active")[cls.table_name()]
-        junction_pit = net["_active_pit"]["node"][fa:ta, :]
-        junctions_active = get_lookup(net, "node", "active")[f:t]
+        junction_pit = net["_pit"]["node"][f:t, :]
 
-        if np.any(junction_pit[:, PINIT] < 0):
-            warn(UserWarning('Pipeflow converged, however, the results are physically incorrect '
-                             'as pressure is negative at nodes %s'
-                             % junction_pit[junction_pit[:, PINIT] < 0, ELEMENT_IDX]))
+        if mode in ["hydraulics", "all"]:
+            junctions_connected_hydraulic = get_lookup(net, "node", "active_hydraulics")[f:t]
 
-        res_table["p_bar"].values[junctions_active] = junction_pit[:, PINIT]
-        res_table["t_k"].values[junctions_active] = junction_pit[:, TINIT]
+            if np.any(junction_pit[junctions_connected_hydraulic, PINIT] < 0):
+                warn(UserWarning('Pipeflow converged, however, the results are physically incorrect '
+                                 'as pressure is negative at nodes %s'
+                                 % junction_pit[junction_pit[:, PINIT] < 0, ELEMENT_IDX]))
+
+        #     res_table["p_bar"].values[junctions_connected_hydraulic] = junction_pit[:, PINIT]
+        #     if mode == "hydraulics":
+        #         res_table["t_k"].values[junctions_connected_hydraulic] = junction_pit[:, TINIT]
+        #
+        # if mode in ["heat", "all"]:
+        #     junctions_connected_ht = get_lookup(net, "node", "active_heat_transfer")[f:t]
+        #     res_table["t_k"].values[junctions_connected_ht] = junction_pit[:, TINIT]
+        res_table["p_bar"].values[:] = junction_pit[:, PINIT]
+        res_table["t_k"].values[:] = junction_pit[:, TINIT]
 
     @classmethod
     def get_component_input(cls):
