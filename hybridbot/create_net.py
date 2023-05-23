@@ -583,7 +583,7 @@ if __name__ == "__main__":
 
     # net.flow_control.iloc[:, 3] = 0.075
     end_fcs = net.flow_control[net.flow_control['name'].str.contains('10')].index
-    #net.flow_control.iloc[end_fcs, 3] = 0
+    net.flow_control.iloc[end_fcs, 3] = 0
     # mdot = 0.15
     # heat = 4200 * mdot * 20
     # net.heat_exchanger.iloc[:, 4] = 10
