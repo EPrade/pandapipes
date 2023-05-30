@@ -116,7 +116,7 @@ class Fluid(JSONSerializableClass):
                               % (property_name, self.name))
         return self.all_properties[property_name].get_at_value(*at_values)
 
-    def get_density(self, temperature=NORMAL_TEMPERATURE, pressure=NORMAL_PRESSURE, phase='gas', mode='quality'):
+    def get_density(self, temperature=NORMAL_TEMPERATURE, pressure=NORMAL_PRESSURE, phase='gas', mode='performance'):
         """
         This function returns the density at a certain temperature.
 
@@ -189,7 +189,7 @@ class Fluid(JSONSerializableClass):
                                                             'Methane&Nitrogen&CarbonDioxide&Ethane&Propane&Butane&Pentane&Hexane')
                     viscosity_hgas.set_mole_fractions(mole_fractions)
                     viscosity_hgas.specify_phase(CoolProp.iphase_gas)
-                    viscosity_hgas.update(CoolProp.PT_INPUTS, p_bar * P_CONVERSION, temperature)
+                    viscosity_hgas.update(CoolProp.PT_INPUTS, p_bar * P_CONVERSION, temperature[0])
                     dyn_viscosity = viscosity_hgas.viscosity()
                 else:
                     logger.error("Mode is not valid. Please choose 'quality' or 'performance' ")
@@ -293,7 +293,7 @@ class Fluid(JSONSerializableClass):
                 heat_capacity_hgas.set_mole_fractions([0.8957, 0.0159, 0.0077, 0.0615, 0.0125, 0.0048, 0.0009, 0.001])
                 heat_capacity_hgas.specify_phase(CoolProp.iphase_gas)
                 for i in range(len(temperature)):
-                    heat_capacity_hgas.update(CoolProp.PT_INPUTS, p_bar * P_CONVERSION, temperature[i])
+                    heat_capacity_hgas.update(CoolProp.PT_INPUTS, p_bar[i] * P_CONVERSION, temperature[i])
                     heat_capacity_array[i] = heat_capacity_hgas.cpmass()
                 heat_capacity = heat_capacity_array.copy()
             elif self.name == 'lgas':
@@ -373,7 +373,7 @@ class Fluid(JSONSerializableClass):
             molar_mass = MW(self.name)
         return molar_mass
 
-    def get_compressibility(self, p_bar, temperature = np.array([285.15]), mode='quality'):
+    def get_compressibility(self, p_bar, temperature = np.array([285.15]), mode='performance'):
         """
         This function returns the compressibility at a certain pressure.
 
