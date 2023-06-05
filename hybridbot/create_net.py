@@ -118,7 +118,7 @@ def offset_pipe(point_a, point_b, offset, side='right'):
 
 
     AB_off = AB.parallel_offset(offset, side, 16, 0, 5)
-    points_ab=AB_off.boundary
+    points_ab = AB_off.boundary
     point_A = [points_ab.geoms[0].xy[0][0],points_ab.geoms[0].xy[1][0]]
     point_B = [points_ab.geoms[1].xy[0][0],points_ab.geoms[1].xy[1][0]]
 
@@ -126,6 +126,280 @@ def offset_pipe(point_a, point_b, offset, side='right'):
 
 
 
+def get_coordinates(net, return_offset):
+    return_flow_points = []
+    junction_list = net.junction.index.to_list()
+    dist = return_offset
+    sequence = []
+    for coordinate in range(net.junction_geodata.shape[0]):
+        #get from and to coordinate/point of pipe to create offset points via parallel pipe method
+        if coordinate in junction_list:
+            try:
+                offset_junction = net.pipe[net.pipe['from_junction'] == coordinate]['to_junction'].iloc[0]
+            except:
+                offset_junction = net.pipe[net.pipe['to_junction'] == coordinate]['from_junction'].iloc[0]
+
+            reference_point1 = net.junction_geodata.iloc[coordinate]
+            reference_point2 = net.junction_geodata.iloc[offset_junction]
+            new_point, new_point2 = offset_pipe(reference_point1, reference_point2, dist)
+            return_flow_points.append(new_point)
+            sequence.append(coordinate)
+            if offset_junction in junction_list:
+                return_flow_points.append(new_point2)
+                junction_list.remove(offset_junction)
+                sequence.append(offset_junction)
+            junction_list.remove(coordinate)
+    # sort list after junction number rising
+    r_f_points2 = [x for _, x in sorted(zip(sequence, return_flow_points))]
+    return_flow_points = tuple(map(tuple, r_f_points2))
+    return return_flow_points
+
+def get_end_junctions(net):
+    pipe_junctions = net.pipe[['from_junction']].values.tolist()
+    pipe_junctions.extend(net.pipe[['to_junction']].values.tolist())
+    # get junctions that only appear once
+    end_junctions = [temp_x for temp_x in pipe_junctions if pipe_junctions.count(temp_x) == 1]
+    # create normal list out of encapsulated list
+    end_junctions = [item for sublist in end_junctions for item in sublist]
+    return end_junctions
+
+def get_rf_junction_names(net, end_junctions):
+    names = [None] * net.junction_geodata.shape[0]
+    # create names for rf junctions depending on end or cross junctions
+    for j_name in range(net.junction_geodata.shape[0]):
+        if j_name in end_junctions:
+            names[j_name] = 'rf_end_' + str(j_name)
+        else:
+            names[j_name] = 'rf_cross_' + str(j_name)
+    return names
+
+def get_main_junctions_no_and_pipes(net):
+    main_junction_no = net.junction_geodata.shape[0]
+    main_pipes = range(net.pipe.shape[0])
+    return main_pipes, main_junction_no
+
+def prepare_return_flow_junctions(net, return_offset):
+    # distinguish cross junctions and end junctions
+    end_junctions = get_end_junctions(net)
+
+    rf_junction_names = get_rf_junction_names(net, end_junctions)
+
+    r_f_points = get_coordinates(net, return_offset)
+
+    # create main return flow junctions with offset geodata
+    pps.create_junctions(net, net.junction_geodata.shape[0], pn_bar=1, tfluid_k=283.15, name=rf_junction_names,
+                         geodata=r_f_points)
+    return net, end_junctions
+
+def get_parameters(net, route_idx):
+    heat_kw = house_data[house_data['route'] == route_idx]['kW']
+    alpha_per_w_m2k = net.pipe[net.pipe['name'] == route_idx]['alpha_w_per_m2k'].iloc[0]
+    diameter_m = net.pipe[net.pipe['name'] == route_idx]['diameter_m'].iloc[0]
+    return heat_kw, alpha_per_w_m2k, diameter_m
+
+def split_pipe(net, route_idx, house_data):
+    # calculate length of new pipes
+    # ToDo: currently only evenly split lengths depending on number of houses per route/main_pipe
+    number_of_houses_per_route = len(house_data[house_data['route'] == route_idx])
+    length = net.pipe[net.pipe['name'] == route_idx]['length_km'].iloc[0]
+    new_length = length / (number_of_houses_per_route + 2)
+    return new_length, number_of_houses_per_route
+
+def create_components(net, house_data, main_junctions_no, end_junctions, first_route):
+    for route_idx in house_data['route'].unique():
+        #ToDo: currently extracting heat for heat exchangers from house_data. Should probably be standard value or function input
+        heat_kw, alpha_per_w_m2k, diameter_m = get_parameters(net, route_idx)
+
+        from_j = net.pipe[net.pipe['name'] == route_idx]['from_junction'].iloc[0]
+        to_j = net.pipe[net.pipe['name'] == route_idx]['to_junction'].iloc[0]
+
+        new_length, number_of_houses_per_route = split_pipe(net, route_idx, house_data)
+
+        #check if route ends in ending or crossing and create junctions and pipe lists accordingly
+        junction_index = net.junction.shape[0]
+        pipe_variable = 0
+        if to_j in end_junctions:
+            #end_junctions = True
+            pipe_list = [None] * (number_of_houses_per_route*2+1)
+            junction_list_fc = [None] * (number_of_houses_per_route)
+            junction_list_he = [None] * (number_of_houses_per_route)
+            junction_list_rf = [None] * (number_of_houses_per_route)
+            rf_lauf=junction_index + number_of_houses_per_route*2
+            #iterate over number of houses and create junctions for pipes, flow controls and heat exchangers
+            for ii in range(number_of_houses_per_route):
+                placeholder = True
+                junction_list_fc[ii] = junction_index
+                junction_list_he[ii] = junction_index+1
+                junction_list_rf[ii] = rf_lauf
+                rf_lauf+=1
+                junction_index+=2
+                pipe_list[pipe_variable + 1] = junction_list_fc[ii]
+                pipe_list[pipe_variable + 2] = junction_list_fc[ii]
+                pipe_variable+=2
+            junction_list_fc[-1] = to_j
+            pipe_list = pipe_list[0: -1]
+
+        else:
+            #end_junctions = False
+            pipe_list = [None] * (number_of_houses_per_route*2+2)
+            junction_list_fc = [None] * (number_of_houses_per_route)
+            junction_list_he = [None] * (number_of_houses_per_route)
+            junction_list_rf = [None] * (number_of_houses_per_route)
+            rf_lauf = junction_index + number_of_houses_per_route * 2
+            for ii in range(number_of_houses_per_route):
+                junction_list_fc[ii] = junction_index
+                junction_list_he[ii] = junction_index+1
+                junction_list_rf[ii] = rf_lauf
+                rf_lauf += 1
+                junction_index+=2
+                pipe_list[pipe_variable+1] = junction_list_fc[ii]
+                pipe_list[pipe_variable + 2] = junction_list_fc[ii]
+                pipe_variable += 2
+        pipe_list[0] = from_j
+        pipe_list[-1] = to_j
+        new_from = pipe_list[::2]
+        new_to = pipe_list[1::2]
+        #junction names
+        name_list1 = ['pipe/fc_' + str(route_idx), 'fc/he_' + str(route_idx)] * number_of_houses_per_route
+        name_list1[::2] = [name_list1[::2][x] + '_' + house_data[house_data['route']==route_idx]['name'].iloc[x]  for x in list(range(number_of_houses_per_route))]
+        name_list1[1::2] = [name_list1[1::2][x] + '_' + house_data[house_data['route'] == route_idx]['name'].iloc[x] for x in
+                            list(range(number_of_houses_per_route))]
+        #get coordinate of new junctions created
+        from_coord = net.junction_geodata.loc[from_j, :]
+        to_coord = net.junction_geodata.loc[to_j, :]
+
+        #create coords for junctions between main junctions
+        if from_coord[0] < to_coord[0]:
+            x_dist = (to_coord[0] - from_coord[0]) / number_of_houses_per_route
+            x_coords = np.linspace(from_coord[0], to_coord[0], number_of_houses_per_route)
+            #x_coords = np.arange(from_coord[0], to_coord[0], x_dist)
+        else:
+            x_dist = (to_coord[0] - from_coord[0]) / number_of_houses_per_route
+            x_coords = np.linspace(from_coord[0], to_coord[0], number_of_houses_per_route)
+            #x_coords = np.arange(from_coord[0], to_coord[0], x_dist)
+        if from_coord[1] < to_coord[1]:
+            y_dist = (to_coord[1] - from_coord[1]) / number_of_houses_per_route
+            y_coords = np.linspace(from_coord[1], to_coord[1], number_of_houses_per_route)
+            #y_coords = np.arange(from_coord[1], to_coord[1], y_dist)
+        else:
+            y_dist = (to_coord[1] - from_coord[1]) / number_of_houses_per_route
+            y_coords = np.linspace(from_coord[1], to_coord[1], number_of_houses_per_route)
+            #y_coords = np.arange(from_coord[1], to_coord[1], y_dist)
+
+        x_coords = np.repeat(x_coords, 2)
+        y_coords = np.repeat(y_coords, 2)
+        new_coords1 = np.stack((x_coords, y_coords), axis=1)
+        new_coords2 = new_coords1[::-1]
+
+        #create new junctions for components and houses
+
+        pps.create_junctions(net, number_of_houses_per_route * 2, pn_bar=1, tfluid_k=283.15, name=name_list1,
+                             geodata=new_coords1)
+
+        #create geodata between main junctions rf
+        from_coord = net.junction_geodata.loc[from_j+main_junctions_no, :]
+        to_coord = net.junction_geodata.loc[to_j+main_junctions_no, :]
+
+        if from_coord[0] < to_coord[0]:
+            x_dist = (to_coord[0] - from_coord[0]) / number_of_houses_per_route
+            x_coords = np.linspace(from_coord[0], to_coord[0], number_of_houses_per_route)
+            #x_coords = np.arange(from_coord[0], to_coord[0], x_dist)
+        else:
+            x_dist = (to_coord[0] - from_coord[0]) / number_of_houses_per_route
+            x_coords = np.linspace(from_coord[0], to_coord[0], number_of_houses_per_route)
+            #x_coords = np.arange(from_coord[0], to_coord[0], x_dist)
+        if from_coord[1] < to_coord[1]:
+            y_dist = (to_coord[1] - from_coord[1]) / number_of_houses_per_route
+            y_coords = np.linspace(from_coord[1], to_coord[1], number_of_houses_per_route)
+            #y_coords = np.arange(from_coord[1], to_coord[1], y_dist)
+        else:
+            y_dist = (to_coord[1] - from_coord[1]) / number_of_houses_per_route
+            y_coords = np.linspace(from_coord[1], to_coord[1], number_of_houses_per_route)
+            #y_coords = np.arange(from_coord[1], to_coord[1], y_dist)
+
+        new_coords = np.stack((x_coords, y_coords), axis=1)
+        new_coords3 = new_coords[::-1]
+        new_coords = tuple(map(tuple, new_coords))
+
+        # create components from lists
+        name_list = ['he_rf_' + str(route_idx)] * number_of_houses_per_route
+        name_list = [name_list[x] + '_' + house_data[house_data['route'] == route_idx]['name'].iloc[x] for x in
+                           list(range(number_of_houses_per_route))]
+
+        #create return flow junctions
+        pps.create_junctions(net, number_of_houses_per_route, pn_bar=1, tfluid_k=283.15, name=name_list,
+                             geodata=new_coords)
+
+        #create components and new pipes
+        pps.create_flow_controls(net, junction_list_fc, junction_list_he, 0.2, 0.2, name=('fc_'+str(route_idx)))
+        pps.create_heat_exchangers(net, junction_list_he, junction_list_rf, 0.01, heat_kw*1000, name=('he_'+str(route_idx)))
+        pps.create_pipes_from_parameters(net, new_from, new_to, sections=5, length_km=new_length, diameter_m=diameter_m, k_mm=0.02, name=('route'+str(route_idx)),alpha_w_per_m2k=alpha_per_w_m2k)
+
+        #create return flow pipes
+
+            #check if first/starting route
+        if route_idx !=first_route:
+            to_j_rf = net.junction[net.junction['name'].astype(str).str.match('rf_cross_' + str(from_j))].index[0]
+            if to_j in end_junctions:
+                from_j_rf_end = net.junction[net.junction['name'].astype(str).str.contains('he_rf_' + str(route_idx))].iloc[
+                    -1].name
+                from_junction = from_j_rf_end
+                pipe_list = [None] * (number_of_houses_per_route*2)
+                rf_junctions = net.junction[net.junction['name'].astype(str).str.contains('he_rf_' + str(route_idx))]
+                # 1 junction from pipe to fc; 1 junction fc to he; 1 junction end of he ;
+                # -1 because at the last house pipe to fc is ending junction
+                rf_j_variable = 0
+                for ii in range(0,number_of_houses_per_route*2-2,2):
+                    pipe_list[ii+1] = rf_junctions.iloc[-rf_j_variable-2].name
+                    pipe_list[ii+2] = rf_junctions.iloc[-rf_j_variable-2].name
+                    rf_j_variable+=1
+            else:
+                #check if 'to_junction' is end junction
+                from_j_rf_cross = \
+                net.junction[net.junction['name'].astype(str).str.match('rf_cross_' + str(to_j))].iloc[
+                    -1].name
+                from_junction = from_j_rf_cross
+                pipe_list = [None] * (number_of_houses_per_route*2 + 2)
+                rf_junctions = net.junction[net.junction['name'].astype(str).str.contains('he_rf_' + str(route_idx))]
+                # +1 pipe because connection to cross is needed instead of installing last house at end section
+                rf_j_variable = 0
+                for ii in range(0,number_of_houses_per_route*2-1,2):
+                    pipe_list[ii + 1] = rf_junctions.iloc[-rf_j_variable - 1].name
+                    pipe_list[ii + 2] = rf_junctions.iloc[-rf_j_variable - 1].name
+                    rf_j_variable += 1
+            pipe_list[0] = from_junction
+            pipe_list[-1] = to_j_rf
+            new_from = pipe_list[::2]
+            new_to = pipe_list[1::2]
+            pps.create_pipes_from_parameters(net, new_from, new_to, sections=5, length_km=new_length, diameter_m=diameter_m, k_mm=0.02,
+                                             name=('route_rf_' + str(route_idx)),alpha_w_per_m2k=alpha_per_w_m2k)
+        else:
+
+            pps.create_junction(net, pn_bar=1, tfluid_k=283.15, name='junction_to_pump', geodata=net.junction_geodata.iloc[0])
+            to_junction = net.junction[net.junction['name'].astype(str).str.contains('pump')].index[0]
+            from_j_rf_end = net.junction[net.junction['name'].astype(str).str.endswith('rf_cross_' + str(to_j))].iloc[-1].name
+            from_junction = from_j_rf_end
+            pipe_list = [None] * (number_of_houses_per_route * 2+2)
+            rf_junctions = net.junction[net.junction['name'].astype(str).str.contains('he_rf_' + str(route_idx))]
+            rf_j_variable = 0
+            for ii in range(0, number_of_houses_per_route *2-1, 2):
+                pipe_list[ii + 1] = rf_junctions.iloc[-rf_j_variable - 1].name
+                pipe_list[ii + 2] = rf_junctions.iloc[-rf_j_variable - 1].name
+                rf_j_variable += 1
+            pipe_list[0] = from_junction
+            pipe_list[-1] = to_junction
+            new_from = pipe_list[::2]
+            new_to = pipe_list[1::2]
+            pps.create_pipes_from_parameters(net, new_from, new_to, sections=5, length_km=new_length, diameter_m=diameter_m, k_mm=0.02,
+                                             name=('route_rf_' + str(route_idx)), alpha_w_per_m2k=alpha_per_w_m2k)
+            pump_junction = to_junction
+
+        if to_j in end_junctions:
+
+            idx_end = net.junction[net.junction['name']== name_list1[-2]].index
+            net.junction.loc[idx_end, 'in_service'] = False
+            net.junction.iloc[to_j, 0] = name_list1[-2]
+    return net
 
 def create_front_and_return_flow(net, return_offset, house_data, first_route=1, drop_old_pipes = False):
     """
@@ -148,66 +422,20 @@ def create_front_and_return_flow(net, return_offset, house_data, first_route=1, 
     :rtype: int
     """
 
-    #distinguish cross junctions and end junctions
 
-    #get from and to junctions
-    temp_a = net.pipe[['from_junction']].values.tolist()
-    temp_a.extend(net.pipe[['to_junction']].values.tolist())
-    # get junctions that only appear once
-    end_junctions = [temp_x for temp_x in temp_a if temp_a.count(temp_x) == 1]
-    # create normal list out of encapsulated list
-    end_junctions = [item for sublist in end_junctions for item in sublist]
+
+
     pump_junction = None
 
     #change house_data columns
     house_data.set_axis(['name', 'route', 'kW'], axis=1, inplace=True)
 
     #number of main junctions and range for number of main pipes/routes
-    main_junction_n = net.junction_geodata.shape[0]
-    main_pipes = range(net.pipe.shape[0])
-    main_pipes_idx = [*net.pipe.index]
-    main_junctions_idx = [*net.junction.index]
-    # create cross junctions for return flow with geodata
-    names = [None] * net.junction_geodata.shape[0]
-    #create names for rf junctions depending on end or cross junctions
-    for j_name in range(net.junction_geodata.shape[0]):
-        if j_name in end_junctions:
-            names [j_name] = 'rf_end_' + str(j_name)
-        else:
-            names [j_name] = 'rf_cross_' + str(j_name)
+    main_pipes, main_junction_no = get_main_junctions_no_and_pipes(net)
 
-    r_f_points = []
-    j_list = net.junction.index.to_list()
-    dist = return_offset
-    sequence = []
-    for xy in range(net.junction_geodata.shape[0]):
-        #get from and to coordinate/point of pipe to create offset points via parallel pipe method
-        if xy in j_list:
-            try:
-                j2 = net.pipe[net.pipe['from_junction'] == xy]['to_junction'].iloc[0]
-            except:
-                j2 = net.pipe[net.pipe['to_junction'] == xy]['from_junction'].iloc[0]
-
-            ref_point1 = net.junction_geodata.iloc[xy]
-            ref_point2 = net.junction_geodata.iloc[j2]
-            new_point, new_point2 = offset_pipe(ref_point1, ref_point2, dist)
-            r_f_points.append(new_point)
-            sequence.append(xy)
-            if j2 in j_list:
-                r_f_points.append(new_point2)
-                j_list.remove(j2)
-                sequence.append(j2)
-            j_list.remove(xy)
-
-    # sort list after junction number rising
-    r_f_points2 = [x for _, x in sorted(zip(sequence, r_f_points))]
-    r_f_points = tuple(map(tuple, r_f_points2))
-
-    #create main return flow junctions with offset geodata
-    pps.create_junctions(net, net.junction_geodata.shape[0], pn_bar=1, tfluid_k=283.15, name=names,
-                         geodata=r_f_points)
-    end_routes = pd.DataFrame()
-    end_routes['name'] = net.pipe[net.pipe['to_junction'].isin(end_junctions)].name
+    net, end_junctions = prepare_return_flow_junctions(net, return_offset)
+    # end_routes = pd.DataFrame()
+    # end_routes['name'] = net.pipe[net.pipe['to_junction'].isin(end_junctions)].name
 
     routes_with_houses = house_data['route'].unique()
     pipes_without_houses = net.pipe[~net.pipe['name'].isin(routes_with_houses)]
@@ -310,8 +538,8 @@ def create_front_and_return_flow(net, return_offset, house_data, first_route=1, 
                              geodata=new_coords1)
 
         #create geodata between main junctions rf
-        from_coord = net.junction_geodata.loc[from_j+main_junction_n, :]
-        to_coord = net.junction_geodata.loc[to_j+main_junction_n, :]
+        from_coord = net.junction_geodata.loc[from_j+main_junction_no, :]
+        to_coord = net.junction_geodata.loc[to_j+main_junction_no, :]
 
         if from_coord[0] < to_coord[0]:
             x_dist = (to_coord[0] - from_coord[0]) / number_of_houses_per_route

@@ -17,7 +17,7 @@ if __name__ == "__main__":
     pps.create_junctions(net, 8, 1.05, 273.15+10)
     pps.create_flow_controls(net, [1,4], [2,5], 0.1, 0.05)
     pps.create_heat_exchangers(net, [2,5], [3,6], 0.05, 50000)
-    pps.create_pipes_from_parameters(net, [0,1,6,3], [1,4,3,7], 5, 0.1)
+    pps.create_pipes_from_parameters(net, [0,1,6,3], [1,4,3,7], 5, 0.1, alpha_w_per_m2k=0)
     pps.create_circ_pump_const_pressure(net, 7, 0, 9, 2.6,
                                     t_flow_k=273.15+90)
     from pandapipes import topology as tp
