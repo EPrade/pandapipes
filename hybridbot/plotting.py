@@ -5,7 +5,7 @@ import numpy as np
 
 plot_data_no_dso = pd.DataFrame()
 for i in range(96):
-    path = r"C:\Users\eprade\Documents\hybridbot\heating grid\res\res2\Res_noDSO\Results\pipeflow\resultfile_evaluation" + str(i) + ".p"
+    path = r"C:\Users\eprade\Documents\hybridbot\heating grid\res\Results_06_06\Res_no_DSO\pipeflow\resultfile_evaluation" + str(i) + ".p"
     data = pd.read_pickle(path)
     data = data.transpose()
     data = data.rename(index={"data":i})
@@ -14,7 +14,7 @@ for i in range(96):
 
 plot_data_dso = pd.DataFrame()
 for i in range(96):
-    path = r"C:\Users\eprade\Documents\hybridbot\heating grid\res\res2\Res_12.7_DSO\Results\pipeflow\resultfile_evaluation" + str(i) + ".p"
+    path = r"C:\Users\eprade\Documents\hybridbot\heating grid\res\Results_06_06\Res_12_7_DSO\pipeflow\resultfile_evaluation" + str(i) + ".p"
     data = pd.read_pickle(path)
     data = data.transpose()
     data = data.rename(index={"data":i})
