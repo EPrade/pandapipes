@@ -57,6 +57,8 @@ def _output_writer(net, time_steps, ow_path=None):
 
 transient_transfer = True
 
+#net = pp.from_json(r"C:\Users\eprade\Documents\hybridbot\heating grid\net_v21_06_ng.json")
+
 net = pp.create_empty_network(fluid="water")
 # create junctions
 j1 = pp.create_junction(net, pn_bar=1.05, tfluid_k=293, name="Junction 1")
