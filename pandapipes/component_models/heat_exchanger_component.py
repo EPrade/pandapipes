@@ -87,7 +87,8 @@ class HeatExchanger(BranchWZeroLengthComponent):
     def adaption_before_derivatives_hydraulic(cls, net, branch_pit, node_pit, idx_lookups, options):
         f, t = idx_lookups[cls.table_name()]
         heat_exchanger_pit = branch_pit[f:t, :]
-        heat_exchanger_pit[:, QEXT] = net[cls.table_name()].qext_w.values
+        if all(net['heat_exchanger'].in_service) == True:
+            heat_exchanger_pit[:, QEXT] = net[cls.table_name()].qext_w.values
 
     @classmethod
     def calculate_temperature_lift(cls, net, branch_component_pit, node_pit):
