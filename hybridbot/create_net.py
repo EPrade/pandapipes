@@ -650,7 +650,7 @@ def create_front_and_return_flow(net, return_offset, house_data, first_route=1, 
         trans_pipe_to = net.pipe.iloc[pipes_without_houses.index, 2].iloc[0]
         trans_pipe_rf_from = net.junction[net.junction['name'].str.contains('rf_cross_' + str(trans_pipe_from))==True].index
         trans_pipe_rf_to = net.junction[net.junction['name'].str.contains('rf_cross_' + str(trans_pipe_to))==True].index
-        pps.create_pipe_from_parameters(net, trans_pipe_rf_from.to_list()[0], trans_pipe_rf_to.to_list()[0], name='rf_connection' ,length_km=net.pipe.iloc[pipes_without_houses.index, 4].iloc[0], diameter_m=net.pipe.iloc[pipes_without_houses.index, 5].iloc[0], alpha_w_per_m2k=net.pipe.iloc[pipes_without_houses.index, 8].iloc[0], sections=net.pipe.iloc[pipes_without_houses.index, 11].iloc[0])
+        pps.create_pipe_from_parameters(net, trans_pipe_rf_from.to_list()[0], trans_pipe_rf_to.to_list()[0], name='rf_connection' ,length_km=net.pipe.iloc[pipes_without_houses.index, 4].iloc[0], diameter_m=net.pipe.iloc[pipes_without_houses.index, 5].iloc[0], alpha_w_per_m2k=net.pipe.iloc[pipes_without_houses.index, 8].iloc[0], sections=net.pipe.iloc[pipes_without_houses.index, 11].iloc[0], k_mm=0.02)
 
     net.pipe.iloc[droppable_pipes,-2] = False
         # if end_routes[end_routes['name'] == i].shape[0] > 0:
@@ -728,13 +728,19 @@ if __name__ == "__main__":
     #read data
     #in_junctions = pd.read_csv(r"C:\Users\eprade\Documents\hybridbot\junctions.csv")
     #in_junctions = pd.read_csv(r"C:\Users\eprade\Documents\hybridbot\heating grid\net\junctions_new.CSV", delimiter=';')
-    in_junctions = pd.read_csv(r"C:\Users\eprade\Documents\hybridbot\heating grid\net\junctions_new_ng_only.CSV", delimiter=';')
+    #in_junctions = pd.read_csv(r"C:\Users\eprade\Documents\hybridbot\heating grid\net\junctions_new_ng_only.CSV", delimiter=';')
+    in_junctions = pd.read_csv(r"C:\Users\eprade\Documents\hybridbot\heating grid\net\junctions_ng1ng2.CSV",
+                               delimiter=';')
     #in_pipes = pd.read_csv(r"C:\Users\eprade\Documents\hybridbot\pipes.csv")
     #in_pipes = pd.read_csv(r"C:\Users\eprade\Documents\hybridbot\heating grid\net\pipes_new.CSV", delimiter=';')
-    in_pipes = pd.read_csv(r"C:\Users\eprade\Documents\hybridbot\heating grid\net\pipes_new_ng_only.CSV", delimiter=';')
+    #in_pipes = pd.read_csv(r"C:\Users\eprade\Documents\hybridbot\heating grid\net\pipes_new_ng_only.CSV", delimiter=';')
+    in_pipes = pd.read_csv(r"C:\Users\eprade\Documents\hybridbot\heating grid\net\pipes_new_ng1ng2.CSV", delimiter=';')
     #pipe_parameters = pd.read_csv(r"C:\Users\eprade\Documents\hybridbot\heating grid\pipe_parameters.csv")
     #pipe_parameters = pd.read_csv(r"C:\Users\eprade\Documents\hybridbot\heating grid\net\pipe_parameters_new.CSV", delimiter=';')
-    pipe_parameters = pd.read_csv(r"C:\Users\eprade\Documents\hybridbot\heating grid\net\pipe_parameters_new_ng_only.CSV",
+    # pipe_parameters = pd.read_csv(
+    #     r"C:\Users\eprade\Documents\hybridbot\heating grid\net\pipe_parameters_new_ng_only.CSV",
+    #     delimiter=';')
+    pipe_parameters = pd.read_csv(r"C:\Users\eprade\Documents\hybridbot\heating grid\net\pipe_parameters_new_ng1ng2.CSV",
                                   delimiter=';')
 
     #prepare net
@@ -744,28 +750,40 @@ if __name__ == "__main__":
 
     net.junction_geodata[["x", "y"]] = net.junction_geodata[["y", "x"]]
 
-    pps.create_pipes_from_parameters(net, in_pipes['from_junction']-1, in_pipes['to_junction']-1,
-                                     length_km=in_pipes['length_m']/1000,
-                                     diameter_m=pipe_parameters['d_i']/1000, k_mm=0.02, name=in_pipes['pipe'], alpha_w_per_m2k=pipe_parameters['alpha'])
+    index_list_to = []
+    for i in range(len(in_pipes['to_junction'])):
+        index = net.junction.index[net.junction['name'] == in_pipes.to_junction[i]]
+        index_list_to.extend(index.tolist())
+
+    index_list_from = []
+    for i in range(len(in_pipes['from_junction'])):
+        index = net.junction.index[net.junction['name'] == in_pipes.from_junction[i]]
+        index_list_from.extend(index.tolist())
+
+
+    pps.create_pipes_from_parameters(net, index_list_from, index_list_to,
+                                     length_km=pipe_parameters['length']/1000,
+                                     diameter_m=pipe_parameters['d_i']/1000, k_mm=0.02, name=pipe_parameters['route'], alpha_w_per_m2k=pipe_parameters['alpha'])
 
     path = r"C:\Users\eprade\Documents\hybridbot\straßen.csv"
     path_ng = r"C:\Users\eprade\Documents\hybridbot\straßen_nur_ng.csv"
     path_ng_new = r"C:\Users\eprade\Documents\hybridbot\heating grid\net\houses_ng_only.CSV"
+    path_ng_ng = r"C:\Users\eprade\Documents\hybridbot\heating grid\net\houses_ng1ng2.CSV"
     path_complete = r"C:\Users\eprade\Documents\hybridbot\heating grid\net\houses.CSV"
-    house_data = pd.read_csv(path_ng_new, delimiter=';')
+    house_data = pd.read_csv(path_ng_ng, delimiter=';')
     #heat_values = pd.read_csv(r"C:\Users\eprade\Documents\hybridbot\heating grid\heat_values_trassen.csv")
 
 
     net, pump_junction = create_front_and_return_flow(net, 0.0001, house_data)
-
-    pps.create_circ_pump_const_pressure(net, pump_junction, 0, 3, 2.5,
+    net.flow_control.controlled_mdot_kg_per_s = 0.05
+    pps.create_circ_pump_const_pressure(net, pump_junction, 0, 8, 1,
                                       t_flow_k=273.15+80)
     # pps.create_ext_grid(net, pump_junction, p_bar=3)
     # pps.create_ext_grid(net, 0, p_bar=6, t_k=340)
 
     # net.heat_exchanger.iloc[:,4] = 30000
     # switch_off_routes(net)
-    #pps.to_json(net, r"C:\Users\eprade\Documents\hybridbot\heating grid\net_v17_04_ng.json")
+    pps.to_json(net, r"C:\Users\eprade\Documents\hybridbot\heating grid\net_v04_10_ngng.json")
 
     # profiles_heat = pd.read_csv()
     # ds_heat = DFData(profiles_heat)
