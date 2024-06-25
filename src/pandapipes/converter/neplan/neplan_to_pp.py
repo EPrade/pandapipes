@@ -69,6 +69,12 @@ def pps_dh_net_from_neplan(path, net_name, path_std_lib):
 
         loads = create_empty_heat_load(data[elements['consumer_name']], element_type_device1)
 
+        #example
+        cp = 4.195
+        mdot = loads['Q_selected'] / (loads['Vorlauftemperatur'] - loads['T Rückspeise\n[°C]']) / cp
+        q = loads['Q_selected']
+        d_i = loads['Durchmesser\n[mm]'] / 1000
+
         junction_index_dict = {name: index for index, name in enumerate(net.junction['name'])}
         # Create a list of indices by mapping the 'from_node' values to their corresponding indices in 'net.junction'
         from_indices = [junction_index_dict[node] for node in loads['from_node'] if node in junction_index_dict]
@@ -192,19 +198,19 @@ def create_heat_load(data, element_type_device, heat_loads):
     heat_load_parameters['name'] = heat_load['Name']
     heat_load_parameters['from_node'] = heat_load['NodeName0']
     heat_load_parameters['to_node'] = heat_load['NodeName1']
+    merged_df = pd.merge(heat_load_parameters, heat_loads_selected, left_on='name', right_on='Name', how='left')
+    # heat_load_parameters['Q'] = \
+    #     heat_loads_selected[heat_loads_selected['Name'].isin(heat_load['Name'])]['Q_selected']
+    # heat_load_parameters['di'] = \
+    #     heat_loads_selected[heat_loads_selected['Name'].isin(heat_load['Name'])]['Durchmesser\n[mm]']
+    # heat_load_parameters['deltapbar'] = \
+    #     heat_loads_selected[heat_loads_selected['Name'].isin(heat_load['Name'])]['ΔP [bar]']
+    # heat_load_parameters['Tflow'] = \
+    #     heat_loads_selected[heat_loads_selected['Name'].isin(heat_load['Name'])]['Vorlauftemperatur']
+    # heat_load_parameters['Treturn'] = \
+    #     heat_loads_selected[heat_loads_selected['Name'].isin(heat_load['Name'])]['T Rückspeise\n[°C]']
 
-    heat_load_parameters['Q'] = \
-        heat_loads_selected[heat_loads_selected['Name'].isin(heat_load['Name'])]['Q_selected']
-    heat_load_parameters['di'] = \
-        heat_loads_selected[heat_loads_selected['Name'].isin(heat_load['Name'])]['Durchmesser\n[mm]']
-    heat_load_parameters['deltapbar'] = \
-        heat_loads_selected[heat_loads_selected['Name'].isin(heat_load['Name'])]['ΔP [bar]']
-    heat_load_parameters['Tflow'] = \
-        heat_loads_selected[heat_loads_selected['Name'].isin(heat_load['Name'])]['Vorlauftemperatur']
-    heat_load_parameters['Treturn'] = \
-        heat_loads_selected[heat_loads_selected['Name'].isin(heat_load['Name'])]['T Rückspeise\n[°C]']
-
-    return heat_load_parameters
+    return merged_df
 
 def create_valve(data, element_type, path_std_lib):
     """
